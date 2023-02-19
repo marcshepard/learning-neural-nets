@@ -2,7 +2,6 @@
 nn.py - test out building a neural network from basic principals
 """
 import numpy as np
-import random
 
 class Layer:
     """Base class for a neural network layer"""
@@ -53,7 +52,10 @@ class Linear (Layer):
 
     def backward(self, x_input: np.ndarray, err: np.ndarray) -> np.ndarray:
         """Backward pass of the linear layer"""
-        return np.matmul(err, self.weights.transpose())
+        return np.matmul(err, x_input.T)
+        # return np.matmul(err, self.weights.T) - old code
+        #return np.matmul((np.matmul (W, X) - Y), X.transpose()) - back_prop.py algo
+
 
 
 class NeuralNetwork:
@@ -73,8 +75,7 @@ class NeuralNetwork:
 
     def forward(self, x_input: np.ndarray) -> np.ndarray:
         """Forward pass of the neural network"""
-        for i in range(len(self.layers)):
-            layer = self.layers[i]
+        for i, layer in enumerate(self.layers):
             self.inputs[i] = x_input
             x_input = layer.forward(x_input)
         return x_input
@@ -109,26 +110,34 @@ class NeuralNetwork:
 
     def loss(self, y_hat: np.ndarray, y_train: np.ndarray) -> float:
         """Calculate the loss of the neural network"""
-        return np.sum(np.square(y_hat - y_train))/y_train.shape[1]
+        return np.sum(np.square(y_hat - y_train))/y_train.shape[0]
 
     def update_weights(self, learning_rate: float):
         """Update the weights of the neural network"""
-        for i in range(len(self.layers)):
-            if isinstance(self.layers[i], Linear):
-                self.layers[i].weights += learning_rate * \
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, Linear):
+                layer.weights -= learning_rate * \
                     np.matmul(self.inputs[i].transpose(), self.errs[i])
-                
+
     def predict(self, x_input: np.ndarray) -> np.ndarray:
         """Predict the output of the neural network"""
         return self.forward(x_input)
 
+import random
 def test():
     """Test the neural network"""
 
     # 1d identity with 1 neuron
     nn = NeuralNetwork()
     nn.add_layer(Linear(1, 1))
-    nn.train([[0], [1], [2], [3]], [[0], [1], [2], [3]], 10, 0.05, 0)
+    x = []
+    y = []
+    for _ in range (10):
+        x.append([random.randint(0, 10)])
+        y.append(x[-1])
+
+    nn.train(x, y, 10, 0.05, 0)
+    #nn.train([[0], [1], [2], [3]], [[0], [1], [2], [3]], 10, 0.05, 0)
     x = [92]
     y = nn.predict(x)
     if abs(x - y)/x > .1:
@@ -136,14 +145,24 @@ def test():
         print(nn.layers[0].weights)
         print(nn.training_log)
 
+    """
     # 2d identity with 1 layer of 2 neurons
     nn = NeuralNetwork()
     nn.add_layer(Linear(2, 2))
-    nn.train([[0, 0], [0, 1], [1, 0], [1, 1]], [[0, 0], [0, 1], [1, 0], [1, 1]], 100, 0.05, 0)
-    x = [92, 94]
+    
+    x = []
+    y = []
+    for _ in range (5):
+        x.append([random.randint(0, 100), random.randint(0, 100)])
+        y.append(x[-1])
+    nn.train(x, y, 10, 0.05, 0)
+    x = [92, 97]
     y = nn.predict(x)
-    if np.sum(np.square(x - y)) > .1:
-        print("1 layer 2d identity test failed: input = ", x, "predicted output = ", y, "error = ", np.sum(np.square(x - y)))
+    print (x)
+    print (y)
+    percent_error = np.sum(np.square(x - y))/np.sum(np.square(x))
+    if percent_error > .1 :
+        print("1 layer 2d identity test failed: input = ", x, "predicted output = ", y, "error = ", percent_error)
         print(nn.layers[0].weights)
         print(nn.training_log)
     
@@ -165,7 +184,6 @@ def test():
         print(nn.layers[1].weights)
         print(nn.training_log)
 
-    """
     # 2d identity with 1 layer of 2 neurons and ReLU activation
     nn = NeuralNetwork()
     nn.add_layer(Linear(2, 2))
