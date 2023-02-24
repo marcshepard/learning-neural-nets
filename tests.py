@@ -1,27 +1,28 @@
 """test.py - test neural_net.py"""
 
 import numpy as np
-from neural_net import NeuralNet, Linear, Sigmoid, ReLU
+from neural_net import NeuralNet, Linear, Sigmoid, ReLU, CrossEntropy
+
+np.random.seed(12)
 
 def test_1_variable_identity():
     """1 variable identity (1 input, 1 output)"""
     test_name = "1 neuron, 1 input identity"
     nn = NeuralNet()
     nn.add_layer(Linear(1, 1))
-    x = np.random.randint(20, size=(1, 10))
+    x = np.random.randint(100, size=(1, 100))
     y = x
-    nn.train(x, y, 100)
-    x = [92]
-    y = [92]
+    nn.train(x, y, 500, 10)
+
+    x = np.random.randint(100, size=(1, 10))
+    y = x
     y_hat = nn.predict(x)
-    pct_error = abs((y[0] - y_hat[0][0]) * 1000 // y[0]) / 10
-    if pct_error > 5:
-        print(test_name, "with input =", x, ", expected output =", y, \
-                ", actual output =", y_hat)
-        print ("Weight/bias =", nn.layers[0].w, nn.layers[0].b)
-        print("Test failed: error percent = ", pct_error, ">.1")
+    loss = nn.loss_function.loss(y, y_hat)
+    if loss > .1:
+        print(f"{test_name} FAILED with loss = {loss}, input = {x}", \
+              "output =", y_hat, ", weight/bias = ", nn.layers[0].w, nn.layers[0].b)
     else:
-        print (test_name, "passed with", pct_error, "percent error")
+        print (f"{test_name} passed with average MSE loss {loss}")
 
     return nn.loss_per_epoch
 
@@ -30,21 +31,20 @@ def test_1_layer_sum():
     test_name = "1 neuron, 2 input sum"
     nn = NeuralNet()
     nn.add_layer(Linear(2, 1))
+    x = np.random.randint(20, size=(2, 100))
+    y = x.sum(axis=0, keepdims=True)
+    nn.train(x, y, 500, 10)
+
     x = np.random.randint(20, size=(2, 10))
     y = x.sum(axis=0, keepdims=True)
-    nn.train(x, y, 100)
-    x = np.ndarray((2, 1))
-    x[0][0] = 92
-    x[1][0] = 17
-    y = [109]
     y_hat = nn.predict(x)
-    pct_error = abs((y[0] - y_hat[0][0]) * 1000 // y[0]) / 10
-    if pct_error > 5:
-        print(test_name, "with input = ", x, "expected output = ", y, \
-                "actual output = ", y_hat)
-        print("Test failed: error percent = ", pct_error, ">.1")
+    loss = nn.loss_function.loss(y, y_hat)
+    if loss > .1:
+        print(f"{test_name} FAILED with loss = {loss}, input = {x}", \
+              "output =", y_hat, ", weight/bias = ", nn.layers[0].w, nn.layers[0].b)
     else:
-        print (test_name, "passed with", pct_error, "percent error")
+        print (f"{test_name} passed with average MSE loss {loss}")
+
 
 def test_2_layer_2_variable_identity():
     """2d identity test with 2 layer"""
@@ -52,20 +52,19 @@ def test_2_layer_2_variable_identity():
     nn = NeuralNet()
     nn.add_layer(Linear(2, 3))
     nn.add_layer(Linear(3, 2))
+    x = np.random.randint(20, size=(2, 100))
+    y = x
+    nn.train(x, y, 500, 10)
+
     x = np.random.randint(20, size=(2, 10))
     y = x
-    nn.train(x, y, 100)
-    x = np.ndarray((2, 1))
-    x[0][0] = 92
-    x[1][0] = -17
-    y = x
     y_hat = nn.predict(x)
-    pct_error = np.sqrt(np.sum(np.square(y_hat - y))/np.sum(np.square(y)))*1000//1/10
-    if pct_error > 5:
-        print("Test failed:", test_name, "with input = ", x, "expected output = ", y, \
-                "actual output = ", y_hat, "error percent = ", pct_error)
+    loss = nn.loss_function.loss(y, y_hat)
+    if loss > .1:
+        print(f"{test_name} FAILED with loss = {loss}, input = {x}", \
+              "output =", y_hat)
     else:
-        print (test_name, "passed with", pct_error, "percent error")
+        print (f"{test_name} passed with average MSE loss {loss}")
 
 def test_relu_actication():
     """ReLU activation function test"""
@@ -74,23 +73,19 @@ def test_relu_actication():
     nn.add_layer(Linear(2, 6))
     nn.add_layer(ReLU())
     nn.add_layer(Linear(6, 1))
-    nn.add_layer(ReLU())
+
+    x = np.random.randint(100, size=(2, 100))
+    y = np.max(x, 0, keepdims=True) - np.min(x, 0, keepdims=True)
+    nn.train(x, y, 500, 1)
 
     x = np.random.randint(20, size=(2, 10))
     y = np.max(x, 0, keepdims=True) - np.min(x, 0, keepdims=True)
-    nn.train(x, y, 100)
-
-    x = np.ndarray((2, 1))
-    x[0][0] = 14
-    x[1][0] = 3
-    y = [11]
     y_hat = nn.predict(x)
-    pct_error = np.sqrt(np.sum(np.square(y_hat - y))/np.sum(np.square(y)))*1000//1/10
-    if pct_error > 5:
-        print("Test failed:", test_name, "with input = ", x, "expected output = ", y, \
-                "actual output = ", y_hat, "error percent = ", pct_error)
+    loss = nn.loss_function.loss(y, y_hat)
+    if loss > .1:
+        print(f"{test_name} FAILED with loss = {loss}")
     else:
-        print (test_name, "passed with", pct_error, "percent error")
+        print (f"{test_name} passed with average MSE loss {loss}")
 
 def test_classification():
     """Test network w 2 linear layers and 2 activation functions for classification"""
@@ -106,6 +101,7 @@ def test_classification():
     y.shape = (1, 100)
 
     nn.train(x, y, 100, 10)
+    print (test_name, "test was run but not checked for correctness")
 
 
 def test():

@@ -85,9 +85,9 @@ class Linear (Layer):
     """Linear layer"""
 
     def __init__(self, num_inputs: int, num_outputs: int):
-        """Initialize weights and bias with random values between -.5 and .5"""
-        self.w = np.random.rand(num_outputs, num_inputs) - .5
-        self.b = np.random.rand(num_outputs, 1) - .5
+        """Initialize weights and bias with random values between 0 and 1"""
+        self.w = np.random.rand(num_outputs, num_inputs)
+        self.b = np.random.rand(num_outputs, 1)
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Forward pass"""
@@ -164,7 +164,7 @@ class NeuralNet:
                 y_hat = self.forward(x_batch)
                 new_loss = self.loss_function.loss(y_hat, y_batch)
                 last_learning_rate = self.learning_rate
-                while new_loss > loss:
+                while new_loss > loss and last_learning_rate > 0.0001:
                     last_learning_rate /= 2
                     self.update_weights(-last_learning_rate)
                     y_hat = self.predict(x_batch)
