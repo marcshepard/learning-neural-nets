@@ -1,13 +1,7 @@
 """
 nn.py - test out building a more general neural network from basic principals
 
-It was built using the ideas from back_prop.py, as well as this most excellent
-article: https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795.
-
-Although there is one important diffence: after each batch of training, the
-learning rate is exponentially decreased by a factor of 2 until the loss function
-decreased. This ensures the learning rate isn't too large for those inputs or too
-small for others.
+For details, see the README.md file.
 
 Note: pylint has been configured to ignore/allow 1 and 2 letter variable names (as
 god intended), since x = input, y = output, w = weight, b = bias, err = error to be
@@ -20,11 +14,6 @@ import numpy as np
 
 # BackpropOutput is a tuple of (backprop_error, dW, db)
 BackpropOutput = Tuple[np.ndarray, np.ndarray, np.ndarray]
-
-def trace (*args):
-    """Print out the arguments if debug tracing is enabled"""
-    if False:           # pylint: disable=using-constant-test
-        print (*args)
 
 class LossFunction:
     """Base class for a loss function - each method should be overridden"""
@@ -112,19 +101,25 @@ class Linear (Layer):
         backprop_error = np.matmul(self.w.T, err)
         return backprop_error, dw, db
 
-class NeuralNetwork:
+class NeuralNet:
     """Neural network class"""
 
     def __init__(self, loss_function = MSE(), seed = 0):
+        self.debug_trace = False
         self.layers = []
         self.inputs = []
         self.dws = []
         self.dbs = []
-        self.training_log = []
         self.loss_function = loss_function
+        self.loss_per_epoch = None
         self.learning_rate = 0.05
         if seed != 0:
             np.random.seed(seed)
+
+    def trace (self, *args):
+        """Print out the arguments if debug tracing is enabled"""
+        if self.debug_trace:
+            print (*args)
 
     def add_layer(self, layer: Layer):
         """Add a layer to the neural network"""
@@ -144,35 +139,34 @@ class NeuralNetwork:
         """Backward pass of the neural network"""
         for i in range(len(self.layers) - 1, -1, -1):
             err, self.dws[i], self.dbs[i] = self.layers[i].backward(self.inputs[i], err)
-            trace ("backprop dW", self.dws[i], "dB", self.dbs[i])
+            if self.dws[i] is not None:
+                self.trace ("backprop layer", i, "w/b =", self.layers[i].w, self.layers[i].b, ", dw/db =", self.dws[i], self.dbs[i])
 
     def train(self, x_train: np.ndarray, y_train: np.ndarray, epochs: int,
               batch_size : int= 0):
         """Train the neural network"""
-        self.training_log = []
+        self.loss_per_epoch = []
 
         if batch_size == 0:
             batch_size = x_train.shape[1]
 
-        for i in range(epochs):
+        for _ in range(epochs):
+            y_hat = self.forward(x_train)
+            self.loss_per_epoch.append (self.loss_function.loss(y_hat, y_train))
             for j in range(0, len(x_train), batch_size):
                 x_batch = x_train[:, j:j+batch_size]
                 y_batch = y_train[:, j:j+batch_size]
                 y_hat = self.forward(x_batch)
                 loss = self.loss_function.loss(y_hat, y_batch)
                 err = self.loss_function.backward(y_hat, y_batch)
-                self.training_log.append (f"Epoch {i}, Batch {j}, Loss {loss}")
-                trace ("Before backprop, weights are", self.layers[0].w, self.layers[0].b)
                 self.backward(err)
                 self.update_weights(self.learning_rate)
-                trace ("After backprop, weights are", self.layers[0].w, self.layers[0].b)
                 y_hat = self.forward(x_batch)
                 new_loss = self.loss_function.loss(y_hat, y_batch)
                 last_learning_rate = self.learning_rate
                 while new_loss > loss:
                     last_learning_rate /= 2
                     self.update_weights(-last_learning_rate)
-                    trace ("That was worse - trying weights", self.layers[0].w, self.layers[0].b)
                     y_hat = self.predict(x_batch)
                     new_loss = self.loss_function.loss(y_hat, y_batch)
 
@@ -186,117 +180,3 @@ class NeuralNetwork:
     def predict(self, x_input: np.ndarray) -> np.ndarray:
         """Predict the output of the neural network"""
         return self.forward(x_input)
-
-def test_1_variable_identity():
-    """1 variable identity (1 input, 1 output)"""
-    test_name = "1 neuron, 1 input identity"
-    nn = NeuralNetwork()
-    nn.add_layer(Linear(1, 1))
-    x = np.random.randint(20, size=(1, 10))
-    y = x
-    nn.train(x, y, 100)
-    x = [92]
-    y = [92]
-    y_hat = nn.predict(x)
-    pct_error = abs((y[0] - y_hat[0][0]) * 1000 // y[0]) / 10
-    if pct_error > 5:
-        print(test_name, "with input =", x, ", expected output =", y, \
-                ", actual output =", y_hat)
-        print ("Weight/bias =", nn.layers[0].w, nn.layers[0].b)
-        print("Test failed: error percent = ", pct_error, ">.1")
-    else:
-        print (test_name, "passed with", pct_error, "percent error")
-
-def test_1_layer_sum():
-    """1 layer sum (2 inputs, 1 output)"""
-    test_name = "1 neuron, 2 input sum"
-    nn = NeuralNetwork()
-    nn.add_layer(Linear(2, 1))
-    x = np.random.randint(20, size=(2, 10))
-    y = x.sum(axis=0, keepdims=True)
-    nn.train(x, y, 100)
-    x = np.ndarray((2, 1))
-    x[0][0] = 92
-    x[1][0] = 17
-    y = [109]
-    y_hat = nn.predict(x)
-    pct_error = abs((y[0] - y_hat[0][0]) * 1000 // y[0]) / 10
-    if pct_error > 5:
-        print(test_name, "with input = ", x, "expected output = ", y, \
-                "actual output = ", y_hat)
-        print("Test failed: error percent = ", pct_error, ">.1")
-    else:
-        print (test_name, "passed with", pct_error, "percent error")
-
-def test_2_layer_2_variable_identity():
-    """2d identity test with 2 layer"""
-    test_name = "2 layer, 2 input identity"
-    nn = NeuralNetwork()
-    nn.add_layer(Linear(2, 3))
-    nn.add_layer(Linear(3, 2))
-    x = np.random.randint(20, size=(2, 10))
-    y = x
-    nn.train(x, y, 100)
-    x = np.ndarray((2, 1))
-    x[0][0] = 92
-    x[1][0] = -17
-    y = x
-    y_hat = nn.predict(x)
-    pct_error = np.sqrt(np.sum(np.square(y_hat - y))/np.sum(np.square(y)))*1000//1/10
-    if pct_error > 5:
-        print("Test failed:", test_name, "with input = ", x, "expected output = ", y, \
-                "actual output = ", y_hat, "error percent = ", pct_error)
-    else:
-        print (test_name, "passed with", pct_error, "percent error")
-
-def test_relu_actication():
-    """ReLU activation function test"""
-    test_name = "RelU activation function"
-    nn = NeuralNetwork()
-    nn.add_layer(Linear(2, 6))
-    nn.add_layer(ReLU())
-    nn.add_layer(Linear(6, 1))
-    nn.add_layer(ReLU())
-
-    x = np.random.randint(20, size=(2, 10))
-    y = np.max(x, 0, keepdims=True) - np.min(x, 0, keepdims=True)
-    nn.train(x, y, 100)
-
-    x = np.ndarray((2, 1))
-    x[0][0] = 14
-    x[1][0] = 3
-    y = [11]
-    y_hat = nn.predict(x)
-    pct_error = np.sqrt(np.sum(np.square(y_hat - y))/np.sum(np.square(y)))*1000//1/10
-    if pct_error > 5:
-        print("Test failed:", test_name, "with input = ", x, "expected output = ", y, \
-                "actual output = ", y_hat, "error percent = ", pct_error)
-    else:
-        print (test_name, "passed with", pct_error, "percent error")
-
-def test_classification():
-    """Test network w 2 linear layers and 2 activation functions for classification"""
-    test_name = "Classification test with 2 layers"
-    nn = NeuralNetwork(CrossEntropy())
-    nn.add_layer(Linear(2, 6))
-    nn.add_layer(ReLU())
-    nn.add_layer(Linear(6, 1))
-    nn.add_layer(Sigmoid())
-
-    x = np.random.randint(10, size=(2, 100))
-    y = (x[0,:] == x[1,:]) * 1
-    y.shape = (1, 100)
-
-    nn.train(x, y, 100, 10)
-
-
-def test():
-    """Test the neural network"""
-    test_1_variable_identity()
-    test_1_layer_sum()
-    test_2_layer_2_variable_identity()
-    test_relu_actication()
-
-test()
-
-
