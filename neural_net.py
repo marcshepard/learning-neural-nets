@@ -85,9 +85,9 @@ class Linear (Layer):
     """Linear layer"""
 
     def __init__(self, num_inputs: int, num_outputs: int):
-        """Initialize weights and bias with random values between 0 and 1"""
-        self.w = np.random.rand(num_outputs, num_inputs)
-        self.b = np.random.rand(num_outputs, 1)
+        """Initialize weights and bias with random values"""
+        self.w = np.random.rand(num_outputs, num_inputs) - .5
+        self.b = np.random.rand(num_outputs, 1) - .5
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Forward pass"""
@@ -112,7 +112,7 @@ class NeuralNet:
         self.dbs = []
         self.loss_function = loss_function
         self.loss_per_epoch = None
-        self.learning_rate = 0.05
+        self.learning_rate = 0.01
         if seed != 0:
             np.random.seed(seed)
 
@@ -139,8 +139,6 @@ class NeuralNet:
         """Backward pass of the neural network"""
         for i in range(len(self.layers) - 1, -1, -1):
             err, self.dws[i], self.dbs[i] = self.layers[i].backward(self.inputs[i], err)
-            if self.dws[i] is not None:
-                self.trace ("backprop layer", i, "w/b =", self.layers[i].w, self.layers[i].b, ", dw/db =", self.dws[i], self.dbs[i])
 
     def train(self, x_train: np.ndarray, y_train: np.ndarray, epochs: int,
               batch_size : int= 0):
@@ -154,21 +152,24 @@ class NeuralNet:
             y_hat = self.forward(x_train)
             self.loss_per_epoch.append (self.loss_function.loss(y_hat, y_train))
             for j in range(0, len(x_train), batch_size):
+                # Update weights after processing a mini-batch
                 x_batch = x_train[:, j:j+batch_size]
                 y_batch = y_train[:, j:j+batch_size]
                 y_hat = self.forward(x_batch)
-                loss = self.loss_function.loss(y_hat, y_batch)
                 err = self.loss_function.backward(y_hat, y_batch)
                 self.backward(err)
                 self.update_weights(self.learning_rate)
-                y_hat = self.forward(x_batch)
-                new_loss = self.loss_function.loss(y_hat, y_batch)
+
+                # If new weights cause a loss increase, halve the learning rate and try again
                 last_learning_rate = self.learning_rate
-                while new_loss > loss and last_learning_rate > 0.0001:
+                loss = self.loss_function.loss(y_hat, y_batch)
+                while True:
+                    y_hat = self.forward(x_batch)
+                    new_loss = self.loss_function.loss(y_hat, y_batch)
+                    if new_loss < loss or last_learning_rate < 0.00001:
+                        break
                     last_learning_rate /= 2
                     self.update_weights(-last_learning_rate)
-                    y_hat = self.predict(x_batch)
-                    new_loss = self.loss_function.loss(y_hat, y_batch)
 
     def update_weights(self, learning_rate: float):
         """Update the weights of the neural network"""

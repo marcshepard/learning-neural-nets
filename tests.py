@@ -1,9 +1,18 @@
 """test.py - test neural_net.py"""
 
 import numpy as np
+import matplotlib.pyplot as plt
 from neural_net import NeuralNet, Linear, Sigmoid, ReLU, CrossEntropy
 
 np.random.seed(12)
+
+def show_loss(loss_per_epoch):
+    """Show loss per epoch"""
+    plt.plot(loss_per_epoch)
+    plt.title("Loss per epoch")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.show()
 
 def test_1_variable_identity():
     """1 variable identity (1 input, 1 output)"""
@@ -75,15 +84,17 @@ def test_relu_actication():
     nn.add_layer(Linear(6, 1))
 
     x = np.random.randint(100, size=(2, 100))
-    y = np.max(x, 0, keepdims=True) - np.min(x, 0, keepdims=True)
-    nn.train(x, y, 500, 1)
+    y = np.max(x, axis=0, keepdims=True) - np.min(x, axis=0, keepdims=True)
+    nn.train(x, y, 500, 20)
 
     x = np.random.randint(20, size=(2, 10))
-    y = np.max(x, 0, keepdims=True) - np.min(x, 0, keepdims=True)
+    y = np.max(x, axis=0, keepdims=True) - np.min(x, axis=0, keepdims=True)
     y_hat = nn.predict(x)
     loss = nn.loss_function.loss(y, y_hat)
     if loss > .1:
         print(f"{test_name} FAILED with loss = {loss}")
+        print(f"{nn.loss_per_epoch[-1]} was the loss after the last epoch")
+        show_loss(nn.loss_per_epoch)
     else:
         print (f"{test_name} passed with average MSE loss {loss}")
 
@@ -97,12 +108,11 @@ def test_classification():
     nn.add_layer(Sigmoid())
 
     x = np.random.randint(10, size=(2, 100))
-    y = (x[0,:] == x[1,:]) * 1
-    y.shape = (1, 100)
+    y = (x.sum(axis=0, keepdims=True) % 2).reshape(1, 100)
 
-    nn.train(x, y, 100, 10)
+    nn.train(x, y, 500, 10)
     print (test_name, "test was run but not checked for correctness")
-
+    show_loss(nn.loss_per_epoch)
 
 def test():
     """Test the neural network"""
@@ -110,5 +120,6 @@ def test():
     test_1_layer_sum()
     test_2_layer_2_variable_identity()
     test_relu_actication()
+    test_classification()
 
 test()
