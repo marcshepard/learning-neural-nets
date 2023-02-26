@@ -1,5 +1,5 @@
 """
-nn.py - test out building a more general neural network from basic principals
+nn.py - a neural network built on numpy from basic principals (so I could learn)
 
 For details, see the README.md file.
 
@@ -9,97 +9,107 @@ backprop'ed, dw = weight gradient, db = bias gradient, nn = neural net, are all
 common variable names in neural nets, so artificially forcing longer names would be
 silly.
 """
-from typing import Tuple
 import numpy as np
-
-# BackpropOutput is a tuple of (backprop_error, dW, db)
-BackpropOutput = Tuple[np.ndarray, np.ndarray, np.ndarray]
+import matplotlib.pyplot as plt
 
 class LossFunction:
     """Base class for a loss function - each method should be overridden"""
 
-    def loss(self, y_hat: np.ndarray, y: np.ndarray) -> float:  # pylint: disable=unused-argument
-        """Forward pass of the loss function for y_hat and y"""
+    def loss(self, y: np.ndarray, y_train: np.ndarray) -> float:  # pylint: disable=unused-argument
+        """Loss function for y vs y_train (actual vs expected output)"""
         return None
 
-    def backward(self, y_hat: np.ndarray, y: np.ndarray) -> np.ndarray:  # pylint: disable=unused-argument
-        """Backward pass of the loss function for y_hat and y"""
+    def backward(self, y: np.ndarray, y_train: np.ndarray) -> np.ndarray:  # pylint: disable=unused-argument
+        """The gradient of loss with respect to y, used for backprop"""
         return None
 
 class MSE (LossFunction):
-    """Mean Squared Error loss function"""
-    def loss(self, y_hat: np.ndarray, y: np.ndarray) -> float:
-        """Forward pass of the MSE loss function"""
-        return np.sum((y_hat - y) ** 2) / y_hat.shape[1]
+    """Mean squared error of y vs y_train (actual vs expected output)"""
 
-    def backward(self, y_hat: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """Backward pass of the MSE loss function"""
-        return 2 * (y_hat - y) / y_hat.shape[1]
+    def loss(self, y: np.ndarray, y_train: np.ndarray) -> float:
+        """Forward pass of the MSE loss function"""
+        return np.sum((y - y_train) ** 2) / y.shape[1]
+
+    def backward(self, y: np.ndarray, y_train: np.ndarray) -> np.ndarray:
+        """The gradient of loss with respect to y, used for backprop"""
+        return 2 * (y - y_train) / y.shape[1]
 
 class CrossEntropy (LossFunction):
-    """Cross Entropy loss function"""
-    def loss(self, y_hat: np.ndarray, y: np.ndarray) -> float:
+    """Cross Entropy loss function of y vs y_train (actual vs expected output)
+    See https://machinelearningmastery.com/cross-entropy-for-machine-learning"""
+    def loss(self, y: np.ndarray, y_train: np.ndarray) -> float:
         """Forward pass of the Cross Entropy loss function"""
-        return -np.sum(y * np.log(y_hat) + (1 - y) * np.log(1 - y_hat)) / y_hat.shape[1]
+        return -np.sum(y_train * np.log(y) + (1 - y_train) * np.log(1 - y)) / y.shape[1]
 
-    def backward(self, y_hat: np.ndarray, y: np.ndarray) -> np.ndarray:
-        """Backward pass of the Cross Entropy loss function"""
-        return (y_hat - y) / (y_hat * (1 - y_hat))
+    def backward(self, y: np.ndarray, y_train: np.ndarray) -> np.ndarray:
+        """The gradient of loss with respect to y, used for backprop"""
+        return -y_train/y + (1-y_train)/(1-y)
+
 
 class Layer:
     """Base class for a neural network layer - each method should be overridden"""
 
     def forward(self, x: np.ndarray) -> np.ndarray:       # pylint: disable=unused-argument
-        """Forward pass of the layer for x"""
+        """Output of layer given input x from the previos layer"""
         return None
 
-    def backward(self, x: np.ndarray, err: np.ndarray) -> BackpropOutput:  # pylint: disable=unused-argument
-        """Backward pass of the layer, given x_input and backprop'ed output error err
-        Returns: (back_err, dw, db) where back_err is the error that should be backproped to the
-        previous layer, dw is the gradient of the weights, and db is the gradient of the bias"""
-        return None, None, None
+    def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:  # pylint: disable=unused-argument
+        """Backward pass of the layer: given x_input and backprop'ed output error dy
+        from the next layer, compute the backprop'ed error for the previous layer"""
+        return None
+
+    def adjust_weights (self, learning_rate) -> None: # pylint: disable=unused-argument
+        """Adjust the weights - linear layer overrides"""
 
 class Sigmoid (Layer):
     """Sigmoid activation function"""
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """Forward pass of the sigmoid layer"""
+        """Sigmoid output input x from the previos layer"""
         return 1 / (1 + np.exp(-x))
 
-    def backward(self, x: np.ndarray, err: np.ndarray) -> BackpropOutput:
+    def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:
         """Backward pass of the sigmoid layer"""
-        return err * x * (1 - x), None, None
+        sig = self.forward(x)
+        return dy * sig * (1 - sig)
 
 class ReLU (Layer):
     """ReLU activation function"""
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """Forward pass of the ReLU layer"""
+        """ReLU output input x from the previos layer"""
         return np.maximum(0, x)
 
-    def backward(self, x: np.ndarray, err: np.ndarray) -> BackpropOutput:
+    def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:
         """Backward pass of the ReLU layer"""
-        return err * (x > 0), None, None
+        return dy * (x > 0)
 
 class Linear (Layer):
     """Linear layer"""
 
     def __init__(self, num_inputs: int, num_outputs: int):
-        """Initialize weights and bias with random values"""
-        self.w = np.random.rand(num_outputs, num_inputs) - .5
-        self.b = np.random.rand(num_outputs, 1) - .5
+        """Initialize weights and bias with small random values"""
+        self.w = .5 * np.random.rand(num_outputs, num_inputs) - .25
+        self.b = .5 * np.random.rand(num_outputs, 1) - .25
+        self.dw = None
+        self.db = None
 
     def forward(self, x: np.ndarray) -> np.ndarray:
         """Forward pass"""
         return np.matmul(self.w, x) + self.b
 
-    def backward(self, x: np.ndarray, err: np.ndarray) -> BackpropOutput:
+    def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:
         """Backward pass"""
         num_records = x.shape[1]
-        dw = np.matmul(err, x.T) / num_records
-        db = np.sum (err, axis = 1, keepdims=True) / num_records
-        backprop_error = np.matmul(self.w.T, err)
-        return backprop_error, dw, db
+        self.dw = np.matmul(dy, x.T) / num_records
+        self.db = np.sum (dy, axis = 1, keepdims=True) / num_records
+        backprop_error = np.matmul(self.w.T, dy)
+        return backprop_error
+
+    def adjust_weights (self, learning_rate) -> None:
+        """adjust weights based on gradients computed in backwards pass"""
+        self.w -= self.dw * learning_rate
+        self.b -= self.db * learning_rate
 
 class NeuralNet:
     """Neural network class"""
@@ -107,12 +117,9 @@ class NeuralNet:
     def __init__(self, loss_function = MSE(), seed = 0):
         self.debug_trace = False
         self.layers = []
-        self.inputs = []
-        self.dws = []
-        self.dbs = []
         self.loss_function = loss_function
         self.loss_per_epoch = None
-        self.learning_rate = 0.01
+        self.learning_rate = 0.05
         if seed != 0:
             np.random.seed(seed)
 
@@ -124,24 +131,28 @@ class NeuralNet:
     def add_layer(self, layer: Layer):
         """Add a layer to the neural network"""
         self.layers.append(layer)
-        self.inputs.append(None)
-        self.dws.append(None)
-        self.dbs.append(None)
 
-    def forward(self, x_input: np.ndarray) -> np.ndarray:
-        """Forward pass of the neural network"""
-        for i, layer in enumerate(self.layers):
-            self.inputs[i] = x_input
+    def forward(self, x_train: np.ndarray) -> list:
+        """Forward pass; similar to the "predict" method, but tracks (and returns) a list of
+        inputs at each layer for backprop. The last element of inputs is the output"""
+        x_input = x_train
+        inputs = [x_input]
+        for layer in self.layers:
             x_input = layer.forward(x_input)
-        return x_input
+            inputs.append(x_input)
+        return inputs
 
-    def backward(self, err: np.ndarray):
-        """Backward pass of the neural network"""
+    def backward(self, dy: np.ndarray, inputs : list):
+        """Backward pass of the neural network
+        Takes the gradient of the loss function (dy) as input, and "back propogates" it to to
+        each layer by iteratively computing the gradient of each layers output as a function
+        of it's input
+        """
         for i in range(len(self.layers) - 1, -1, -1):
-            err, self.dws[i], self.dbs[i] = self.layers[i].backward(self.inputs[i], err)
+            dy = self.layers[i].backward(inputs[i], dy)
 
     def train(self, x_train: np.ndarray, y_train: np.ndarray, epochs: int,
-              batch_size : int= 0):
+              batch_size : int = 0):
         """Train the neural network"""
         self.loss_per_epoch = []
 
@@ -149,23 +160,27 @@ class NeuralNet:
             batch_size = x_train.shape[1]
 
         for _ in range(epochs):
-            y_hat = self.forward(x_train)
+            y_hat = self.predict(x_train)
             self.loss_per_epoch.append (self.loss_function.loss(y_hat, y_train))
             for j in range(0, len(x_train), batch_size):
                 # Update weights after processing a mini-batch
                 x_batch = x_train[:, j:j+batch_size]
                 y_batch = y_train[:, j:j+batch_size]
-                y_hat = self.forward(x_batch)
-                err = self.loss_function.backward(y_hat, y_batch)
-                self.backward(err)
+                if j*10 < batch_size:    # First 10% of iterations, process the entire training set
+                    x_batch = x_train
+                    y_batch = y_train
+                inputs = self.forward(x_batch)
+                y = inputs[-1]
+                dy = self.loss_function.backward(y, y_batch)
+                self.backward(dy, inputs)
                 self.update_weights(self.learning_rate)
 
                 # If new weights cause a loss increase, halve the learning rate and try again
                 last_learning_rate = self.learning_rate
-                loss = self.loss_function.loss(y_hat, y_batch)
+                loss = self.loss(y, y_batch)
                 while True:
-                    y_hat = self.forward(x_batch)
-                    new_loss = self.loss_function.loss(y_hat, y_batch)
+                    y = self.predict(x_batch)
+                    new_loss = self.loss(y, y_batch)
                     if new_loss < loss or last_learning_rate < 0.00001:
                         break
                     last_learning_rate /= 2
@@ -173,11 +188,32 @@ class NeuralNet:
 
     def update_weights(self, learning_rate: float):
         """Update the weights of the neural network"""
-        for i, layer in enumerate(self.layers):
-            if isinstance(layer, Linear):
-                layer.w -= learning_rate * self.dws[i]
-                layer.b -= learning_rate * self.dbs[i]
+        for layer in self.layers:
+            layer.adjust_weights (learning_rate)
 
-    def predict(self, x_input: np.ndarray) -> np.ndarray:
-        """Predict the output of the neural network"""
-        return self.forward(x_input)
+    def predict(self, x: np.ndarray) -> np.ndarray:
+        """The neural net's prediction of the output for x_input"""
+        for layer in self.layers:
+            x = layer.forward(x)
+        return x
+
+    def loss (self, y_hat : np.ndarray, y : np.ndarray) -> float:
+        """Compute loss"""
+        return self.loss_function.loss(y_hat, y)
+
+    def plot_loss(self):
+        """Show loss per epoch"""
+        plt.plot(self.loss_per_epoch)
+        plt.title("Loss per epoch", loc = "left")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.show()
+
+    def print_weights(self):
+        """Print the weights for diagnostics"""
+        layer_num = 1
+        for layer in self.layers:
+            if isinstance(layer, Linear):
+                print (f"Weights and biases for linear layer {layer_num}:")
+                print (layer.w, "\n", layer.b)
+            layer_num += 1
