@@ -87,3 +87,9 @@ Issues/thoughts/TODOs:
 3) ReLU activation can sometimes make everything go to 0. So depending on the random seed used to produce the initial weights, the neural net might be great or terrible. Seems like there should be something better that always converges. This is related to (2) above; would like something more deterministic that always worked without the user having to configure learning rates.
 4) Another hyper-parameter I'd like to make optional is number of epochs. Ideally the algo should be able to tell when loss is not decreasing and stop (or not decreasing enough per epoch over enough epochs - perhaps that would be a better hyper parameter).
 * Finish testing sigmoid/classifications to make sure they work.
+
+Up next:
+1) Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
+2) Understand GPT architecture: https://jaykmody.com/blog/gpt-from-scratch/?utm_source=tldrnewsletter
+3) Build something cool
+4) Update linked in profile, make professional contacts
