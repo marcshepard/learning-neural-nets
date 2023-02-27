@@ -82,14 +82,15 @@ Here's how the above summary maps to the actual source code:
 * test.py - test cases to verify the neural net works as intended for various layer configurations and training + validation data.
 
 Issues/thoughts/TODOs:
+0) I've implemented an auto_train method eliminates a few hyper parameters and results in more efficient training:
+* It has a large and non-configurable learning_rate which is dynamically lowered per mini-batch as needed to ensure loss decreases after processing that mini-batch.
+* It also doesn't require the user to specify epochs or batch size parameter. For batch size, it just uses a hueristic. For epochs, it keeps going until it reaches the a loss_target goal or realizes it won't converge before max_epochs.
 1) More thought is needed for linear layer weight initialization. I suspect the right answer depends on the expected input and the activation functions. Different initializations algos give wildly different results (e.g., uniform random between -.25 and .25 vs uniform random between 0 and 1 vs scaled normal distribution), as do different starting seeds.
 2) I'm not a fan of MSE as a loss function, since (for example), training a linear model f(x) = 3x will give wildly different gradients/errors for the same percent error depending on if the training data is small or not. E.g., if weight is initially .5, (so needs to increase by 2.5), then training data of (.01, .03) will result in a small error/adjustment that will barely help, while training data of (100, 300) will result in a huge error/adjustment that will make things worse. That's why I added the exponential backoff. But I suspect there are better ways. I need to add an abstract base class for optimizing so I can experiment with different optimization algos (just learning rate, vs learning rate + exp backoff, vs, ...).
 3) ReLU activation can sometimes make everything go to 0. So depending on the random seed used to produce the initial weights, the neural net might be great or terrible. Seems like there should be something better that always converges. This is related to (2) above; would like something more deterministic that always worked without the user having to configure learning rates.
-4) Another hyper-parameter I'd like to make optional is number of epochs. Ideally the algo should be able to tell when loss is not decreasing and stop (or not decreasing enough per epoch over enough epochs - perhaps that would be a better hyper parameter).
-* Finish testing sigmoid/classifications to make sure they work.
 
 Up next:
-1) Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html
+1) Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html. Implement these same test cases in that framework and compare.
 2) Understand GPT architecture: https://jaykmody.com/blog/gpt-from-scratch/?utm_source=tldrnewsletter
 3) Build something cool
 4) Update linked in profile, make professional contacts

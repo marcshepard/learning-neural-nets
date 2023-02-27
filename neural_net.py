@@ -50,7 +50,7 @@ class Layer:
     """Base class for a neural network layer - each method should be overridden"""
 
     def forward(self, x: np.ndarray) -> np.ndarray:       # pylint: disable=unused-argument
-        """Output of layer given input x from the previos layer"""
+        """Output of layer given input x from the previous layer"""
         return None
 
     def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:  # pylint: disable=unused-argument
@@ -65,7 +65,7 @@ class Sigmoid (Layer):
     """Sigmoid activation function"""
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """Sigmoid output input x from the previos layer"""
+        """Sigmoid output input x from the previous layer"""
         return 1 / (1 + np.exp(-x))
 
     def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:
@@ -77,12 +77,25 @@ class ReLU (Layer):
     """ReLU activation function"""
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """ReLU output input x from the previos layer"""
+        """Forward pass"""
         return np.maximum(0, x)
 
     def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:
-        """Backward pass of the ReLU layer"""
+        """Backward pass"""
         return dy * (x > 0)
+
+class ReLU2 (Layer):
+    """ReLU2 activation function. Like ReLU, but negative values just decrease (but not to zero)
+    to see if it helps by eleminating the 'dead neuron' problem RELU creates. Unfortunately, this
+    does worse on the test data"""
+
+    def forward(self, x: np.ndarray) -> np.ndarray:
+        """Forward pass"""
+        return np.maximum(.1*x, x)
+
+    def backward(self, x: np.ndarray, dy: np.ndarray) -> np.ndarray:
+        """Backward pass of the ReLU2 layer"""
+        return dy * (x > 0) + .1 * dy * (x <= 0)
 
 class Linear (Layer):
     """Linear layer"""
@@ -119,7 +132,7 @@ class NeuralNet:
         self.layers = []
         self.loss_function = loss_function
         self.loss_per_epoch = None
-        self.learning_rate = 0.05
+        self.learning_rate = 0.01
         if seed != 0:
             np.random.seed(seed)
 
@@ -166,17 +179,66 @@ class NeuralNet:
                 # Update weights after processing a mini-batch
                 x_batch = x_train[:, j:j+batch_size]
                 y_batch = y_train[:, j:j+batch_size]
-                if j*10 < batch_size:    # First 10% of iterations, process the entire training set
-                    x_batch = x_train
-                    y_batch = y_train
                 inputs = self.forward(x_batch)
                 y = inputs[-1]
                 dy = self.loss_function.backward(y, y_batch)
                 self.backward(dy, inputs)
                 self.update_weights(self.learning_rate)
 
+    def continue_training (self) -> bool:
+        """Check if we should continue training or not"""
+
+        # Stop if we have hit the max number of epochs
+        max_epochs = 50000
+        if len(self.loss_per_epoch) > max_epochs:
+            return False
+
+        # Stop if we've not made progress in the last min_epochs
+        min_epochs = 100
+        min_loss = min(self.loss_per_epoch)
+        min_loss_ix = self.loss_per_epoch.index(min_loss)
+        if min_loss_ix < len(self.loss_per_epoch) - min_epochs:
+            return False
+
+        return True
+
+    def auto_train(self, x_train: np.ndarray, y_train: np.ndarray, \
+                   x_valid: np.ndarray, y_valid: np.ndarray, target_loss : int): # pylint: disable=too-many-arguments, too-many-locals
+        """Train the neural network without any hyper parameters"""
+        self.loss_per_epoch = []
+
+        # Defaults
+        batch_size = x_train.shape[1]
+        if batch_size > 32:
+            batch_size = 16
+        learning_rate = .05
+
+        # Start training
+        while True:
+            # Log the loss for this epoch.
+            # Stop training if we hit the target_loss, or if we've completed at
+            # least min_epochs and are not trending to the target_loss
+            y = self.predict(x_valid)
+            loss = self.loss(y, y_valid)
+            self.loss_per_epoch.append (loss)
+            if loss < target_loss:
+                return
+            if not self.continue_training():
+                print ("Training terminated due to lack of progress")
+                return
+
+            for j in range(0, len(x_train), batch_size):
+                # Update weights after processing a mini-batch
+                x_batch = x_train[:, j:j+batch_size]
+                y_batch = y_train[:, j:j+batch_size]
+                inputs = self.forward(x_batch)
+                y = inputs[-1]
+                dy = self.loss_function.backward(y, y_batch)
+                self.backward(dy, inputs)
+                self.update_weights(learning_rate)
+
                 # If new weights cause a loss increase, halve the learning rate and try again
-                last_learning_rate = self.learning_rate
+                last_learning_rate = learning_rate
                 loss = self.loss(y, y_batch)
                 while True:
                     y = self.predict(x_batch)
