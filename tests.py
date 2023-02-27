@@ -20,8 +20,8 @@ def train_and_test (nn : NeuralNet, test_name : str, x_train : np.ndarray, y_tra
 
     if math.isnan(loss) or loss > target_loss:
         print(f"FAIL: {test_name}. {summary}")
-        nn.print_weights()
         nn.plot_loss()
+        nn.print_weights()
     else:
         print(f"PASS: {test_name}. {summary}")
 

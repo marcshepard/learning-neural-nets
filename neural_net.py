@@ -102,8 +102,8 @@ class Linear (Layer):
 
     def __init__(self, num_inputs: int, num_outputs: int):
         """Initialize weights and bias with small random values"""
-        self.w = .5 * np.random.rand(num_outputs, num_inputs) - .25
-        self.b = .5 * np.random.rand(num_outputs, 1) - .25
+        self.w = .2 * np.random.rand(num_outputs, num_inputs) - .1
+        self.b = .2 * np.random.rand(num_outputs, 1) - .1
         self.dw = None
         self.db = None
 
