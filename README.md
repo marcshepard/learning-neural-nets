@@ -2,7 +2,7 @@ I created this project to learn neural nets at a deeper level. I sketched out ho
 1. https://en.wikipedia.org/wiki/Backpropagation
 2. https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795
 
-Here are the details of the architecture, some of this may be obvious is you already know neural nets, but writing it helps ne understand it better. A full understanding of this write-up requires that you understand calculus (at least understanding the concept of a gradient) and matrix multiplication.
+Here are the details of the architecture, some of this may be obvious is you already know neural nets, but writing it helped me understand it better. A full understanding of this write-up requires that you understand calculus (at least understanding the concept of a gradient) and matrix multiplication.
 
 First; let's talk about the type of problems neural nets can solve. There are two types:
 * Classification - for given input, predict discreet valued output. For example, given an image of a hand-written digit(an nxn grid of color intensitites), which digit (0-9) is it? Every time you deposit a check, a neural net figures this out. Computer programs could not solve this prior to the invension of neural nets.
