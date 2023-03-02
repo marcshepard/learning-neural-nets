@@ -38,9 +38,11 @@ def test_1_variable_identity():
     nn = NeuralNet()
     nn.add_layer(Linear(1, 1))
 
+    # Training set: 100 records; each col of x is a random ints between 0 and 100, y = x
     x_train = np.random.randint(100, size=(1, 100))
     y_train = x_train
 
+    # Validation set: 20 such records
     x_valid = np.random.randint(100, size=(1, 10)) - 50
     y_valid = x_valid
 
@@ -52,10 +54,12 @@ def test_1_layer_sum():
     nn = NeuralNet()
     nn.add_layer(Linear(2, 1))
 
+    # Training set: 100 records; each col of x is two random ints between 0 and 20, y = sum
     x_train = np.random.randint(20, size=(2, 100))
     y_train = x_train.sum(axis=0, keepdims=True)
 
-    x_valid = np.random.randint(20, size=(2, 10))
+    # Validation set: 20 such records
+    x_valid = np.random.randint(20, size=(2, 20))
     y_valid = x_valid.sum(axis=0, keepdims=True)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid)
@@ -67,10 +71,12 @@ def test_2_layer_2_variable_identity():
     nn.add_layer(Linear(2, 3))
     nn.add_layer(Linear(3, 2))
 
-    x_train = np.random.randint(20, size=(2, 100))
+    # Training set: 100 records; each col of x are two random ints between 0 and 100, y = x
+    x_train = np.random.randint(100, size=(2, 100))
     y_train = x_train
 
-    x_valid = np.random.randint(20, size=(2, 10))
+    # Validation set: 20 such records
+    x_valid = np.random.randint(100, size=(2, 20))
     y_valid = x_valid
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid)
@@ -83,10 +89,12 @@ def test_relu_actication():
     nn.add_layer(ReLU())
     nn.add_layer(Linear(6, 1))
 
-    x_train = np.random.randint(100, size=(2, 100))
+    # Training set: 100 records; each col of x are two random ints between -50 and 50, y = x
+    x_train = np.random.randint(100, size=(2, 100)) - 50
     y_train = np.max(x_train, axis=0, keepdims=True) - np.min(x_train, axis=0, keepdims=True)
 
-    x_valid = np.random.randint(20, size=(2, 10))
+    # Validation set: 20 records with x between -10 and 10
+    x_valid = np.random.randint(20, size=(2, 20)) - 10
     y_valid = np.max(x_valid, axis=0, keepdims=True) - np.min(x_valid, axis=0, keepdims=True)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid)
@@ -98,12 +106,14 @@ def test_simple_classification():
     nn.add_layer(Linear(1, 1))
     nn.add_layer(Sigmoid())
 
+    # Training set: 100 records; each col of x is a random ints between 0 and 20, y = x > 10
     threshold = 10
     x_train = np.random.randint(2 * threshold, size=(1, 100))
     y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
 
-    x_valid = np.random.randint(2 * threshold, size=(1, 10))
-    y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 10)
+    # Training set: 20 such records
+    x_valid = np.random.randint(2 * threshold, size=(1, 20))
+    y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 20)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .05)
 
@@ -117,10 +127,10 @@ def test_classification():
     nn.add_layer(Sigmoid())
 
     threshold = 20
-    x_train = np.random.randint(threshold, size=(2, 100))
+    x_train = np.random.randint(5 * threshold, size=(2, 100)) - 2 * threshold
     y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
 
-    x_valid = np.random.randint(2 * threshold, size=(2, 10))
+    x_valid = np.random.randint(4 * threshold, size=(2, 10)) - 2 * threshold
     y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 10)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .05)

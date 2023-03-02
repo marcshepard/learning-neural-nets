@@ -132,7 +132,9 @@ class NeuralNet:
         self.layers = []
         self.loss_function = loss_function
         self.loss_per_epoch = None
-        self.learning_rate = 0.05
+        self.learning_rate = 0.05   # Initial learning rate
+        self.decay = 0.95           # For auto_train's exponential avg of learning_rate
+        self.max_epochs = 50000     # Auto_train terminates if loss goal not reached by then.
         if seed != 0:
             np.random.seed(seed)
 
@@ -195,8 +197,6 @@ class NeuralNet:
         if batch_size > 32:
             batch_size = 16
         learning_rate = self.learning_rate  # Initial learning rate; decays with exponential average
-        decay = .95                         # learning_rate's exponential average decay rate per batch
-        max_epochs = 50000                  # Terminates training if we hit this many epochs
 
         # Start training
         while True:
@@ -208,7 +208,7 @@ class NeuralNet:
             # Stop training if we hit the target_loss, or if we've completed max_epochs
             if loss < target_loss:
                 return
-            if len(self.loss_per_epoch) > max_epochs:
+            if len(self.loss_per_epoch) > self.max_epochs:
                 return
 
             # Run training over mini-batches of batch_size
@@ -232,7 +232,7 @@ class NeuralNet:
                         break
                     last_learning_rate /= 2
                     self.update_weights(-last_learning_rate)
-                learning_rate = learning_rate * decay + last_learning_rate * (1 - decay)
+                learning_rate = learning_rate * self.decay + last_learning_rate * (1 - self.decay)
 
     def update_weights(self, learning_rate: float):
         """Update the weights of the neural network"""
