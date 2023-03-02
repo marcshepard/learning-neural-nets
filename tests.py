@@ -9,8 +9,15 @@ np.random.seed(13)
 def train_and_test (nn : NeuralNet, test_name : str, x_train : np.ndarray, y_train : np.ndarray,
                     x_valid : np.ndarray, y_valid : np.ndarray, target_loss : int = .05):
     """Train the nn and validate if it meets the target loss"""
+    # Regular training is much less efficient and lots of trial/error to get the right learning rate
+    #nn.learning_rate = .001
+    #nn.train(x_train, y_train, 5000, 10)
+    #y = nn.predict(x_valid)
+    #loss = nn.loss(y, y_valid) * 10000 // 1 / 10000
+
     nn.auto_train(x_train, y_train, x_valid, y_valid, target_loss)
     loss = nn.loss_per_epoch[-1] * 10000 // 1 / 10000
+    
     summary = "Average "
     if isinstance (nn.loss_function, MSE):
         summary += "MSE "
@@ -98,8 +105,7 @@ def test_simple_classification():
     x_valid = np.random.randint(2 * threshold, size=(1, 10))
     y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 10)
 
-    train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .1)
-
+    train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .05)
 
 def test_classification():
     """Test network w 2 linear layers and 2 activation functions for classification"""
@@ -117,7 +123,7 @@ def test_classification():
     x_valid = np.random.randint(2 * threshold, size=(2, 10))
     y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 10)
 
-    train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .1)
+    train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .05)
 
 def test():
     """Test the neural network"""
@@ -129,4 +135,3 @@ def test():
     test_classification()
 
 test()
-

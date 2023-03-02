@@ -2,6 +2,8 @@ I created this project to learn neural nets at a deeper level. I sketched out ho
 1. https://en.wikipedia.org/wiki/Backpropagation
 2. https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795
 
+All the neural net code is in neural_net.py. The test code that actually constructs and trains neural nets is in tests.py. If you want to try it out an explore how to use it, run tests.py.
+
 Here are the details of the architecture, some of this may be obvious is you already know neural nets, but writing it helped me understand it better. A full understanding of this write-up requires that you understand calculus (at least understanding the concept of a gradient) and matrix multiplication.
 
 First; let's talk about the type of problems neural nets can solve. There are two types:
@@ -81,16 +83,18 @@ Here's how the above summary maps to the actual source code:
     * NeuralNetwork - configured adding a set of layers and selecting a cost function. It then has methods train (to train the network using backprop), predict (to predict output for a given input), and loss (just a wrapper for the currently configured CostFunction's loss method)
 * test.py - test cases to verify the neural net works as intended for various layer configurations and training + validation data.
 
-Issues/thoughts/TODOs:
-0) I've implemented an auto_train method eliminates a few hyper parameters and results in more efficient training:
-* It has a large and non-configurable learning_rate which is dynamically lowered per mini-batch as needed to ensure loss decreases after processing that mini-batch.
-* It also doesn't require the user to specify epochs or batch size parameter. For batch size, it just uses a hueristic. For epochs, it keeps going until it reaches the a loss_target goal or realizes it won't converge before max_epochs.
-1) More thought is needed for linear layer weight initialization. I suspect the right answer depends on the expected input and the activation functions. Different initializations algos give wildly different results (e.g., uniform random between -.25 and .25 vs uniform random between 0 and 1 vs scaled normal distribution), as do different starting seeds.
-2) I'm not a fan of MSE as a loss function, since (for example), training a linear model f(x) = 3x will give wildly different gradients/errors for the same percent error depending on if the training data is small or not. E.g., if weight is initially .5, (so needs to increase by 2.5), then training data of (.01, .03) will result in a small error/adjustment that will barely help, while training data of (100, 300) will result in a huge error/adjustment that will make things worse. That's why I added the exponential backoff. But I suspect there are better ways. I need to add an abstract base class for optimizing so I can experiment with different optimization algos (just learning rate, vs learning rate + exp backoff, vs, ...).
+Issues/thoughts:
+1) I've implemented an auto_train method eliminates a few hyper parameters and results in more efficient training:
+* Dynamic learning rate. This was a huge win as it got to a desired minimum much faster and without the need to tune a learning_rate hyper-paramer. The implementation starts with a relatively high rate (.05), but for each mini-batch, if the loss function doesn't decrease with the current learning rate, then cut it in half, readjust the weights, and try again until the loss drops. Then adjust the learning rate using exponential average of the new and old rates; the next mini-batch will start with that. 
+* Specify target loss rather than number of epochs. Another big win.
+2) More thought is needed for linear layer weight initialization. I suspect the right answer depends on the expected input and the activation functions. Different initializations algos give wildly different results (e.g., uniform random between -.25 and .25 vs uniform random between 0 and 1 vs scaled normal distribution), as do different starting seeds. I likely should allow the random number geneation used for weight initialization to be configurable per layer.
 3) ReLU activation can sometimes make everything go to 0. So depending on the random seed used to produce the initial weights, the neural net might be great or terrible. Seems like there should be something better that always converges. This is related to (2) above; would like something more deterministic that always worked without the user having to configure learning rates.
+3) I'm not a fan of MSE as a loss function, since (for example), training a linear model f(x) = 3x will give wildly different gradients/errors for the same percent error depending on if the training data is small or not. E.g., if weight is initially .5, (so needs to increase by 2.5), then training data of (.01, .03) will result in a small error/adjustment that will barely help, while training data of (100, 300) will result in a huge error/adjustment that will make things worse. That's why I added the exponential backoff. But I suspect there are better ways. I need to add an abstract base class for optimizing so I can experiment with different optimization algos (just learning rate, vs learning rate + exp backoff, vs, ...).
 
 Up next:
-1) Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html. Implement these same test cases in that framework and compare.
-2) Understand GPT architecture: https://jaykmody.com/blog/gpt-from-scratch/?utm_source=tldrnewsletter
-3) Build something cool
-4) Update linked in profile, make professional contacts
+* Spend more time on ReLU and figure out if there is a way to make it not go belly-up with some random weights
+* Spend more time thinking about alternative regression loss functions
+* Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html. Implement these same test cases in that framework and compare.
+* Understand GPT architecture: https://jaykmody.com/blog/gpt-from-scratch/?utm_source=tldrnewsletter
+* Build something cool
+* Update linked in profile, make professional contacts
