@@ -188,7 +188,8 @@ class NeuralNet:
                 self.update_weights(self.learning_rate)
 
     def auto_train(self, x_train: np.ndarray, y_train: np.ndarray, \
-                   x_valid: np.ndarray, y_valid: np.ndarray, target_loss : int): # pylint: disable=too-many-arguments, too-many-locals
+                   x_valid: np.ndarray, y_valid: np.ndarray, target_loss : int) \
+                    -> bool : # pylint: disable=too-many-arguments, too-many-locals
         """Train the neural network without any hyper parameters"""
         self.loss_per_epoch = []
 
@@ -207,9 +208,9 @@ class NeuralNet:
             
             # Stop training if we hit the target_loss, or if we've completed max_epochs
             if loss < target_loss:
-                return
+                return True
             if len(self.loss_per_epoch) > self.max_epochs:
-                return
+                return False
 
             # Run training over mini-batches of batch_size
             for j in range(0, x_train.shape[1], batch_size):

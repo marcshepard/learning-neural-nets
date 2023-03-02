@@ -43,7 +43,7 @@ def test_1_variable_identity():
     y_train = x_train
 
     # Validation set: 20 such records
-    x_valid = np.random.randint(100, size=(1, 10)) - 50
+    x_valid = np.random.randint(100, size=(1, 20)) - 50
     y_valid = x_valid
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid)
@@ -111,7 +111,7 @@ def test_simple_classification():
     x_train = np.random.randint(2 * threshold, size=(1, 100))
     y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
 
-    # Training set: 20 such records
+    # Validation set: 20 such records
     x_valid = np.random.randint(2 * threshold, size=(1, 20))
     y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 20)
 
@@ -126,10 +126,13 @@ def test_classification():
     nn.add_layer(Linear(6, 1))
     nn.add_layer(Sigmoid())
 
+    # Training set: 100 records; each col of x are two random ints between -40 and 40
+    # y = if the sum of the ints is > 20
     threshold = 20
-    x_train = np.random.randint(5 * threshold, size=(2, 100)) - 2 * threshold
+    x_train = np.random.randint(4 * threshold, size=(2, 100)) - 2 * threshold
     y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
 
+    # Validation set: 20 such records
     x_valid = np.random.randint(4 * threshold, size=(2, 10)) - 2 * threshold
     y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 10)
 
