@@ -133,7 +133,7 @@ class NeuralNet:
         self.loss_function = loss_function
         self.loss_per_epoch = None
         self.learning_rate = 0.05   # Initial learning rate
-        self.decay = 0.95           # For auto_train's exponential avg of learning_rate
+        self.decay = .99            # For auto_train's exponential avg of learning_rate
         self.max_epochs = 50000     # Auto_train terminates if loss goal not reached by then.
         if seed != 0:
             np.random.seed(seed)

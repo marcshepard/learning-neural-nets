@@ -89,12 +89,12 @@ def test_relu_actication():
     nn.add_layer(ReLU())
     nn.add_layer(Linear(6, 1))
 
-    # Training set: 100 records; each col of x are two random ints between -50 and 50, y = x
-    x_train = np.random.randint(100, size=(2, 100)) - 50
+    # Training set: 1000 records; each col of x are two random ints between -50 and 50, y = x
+    x_train = np.random.randint(100, size=(2, 1000)) - 50
     y_train = np.max(x_train, axis=0, keepdims=True) - np.min(x_train, axis=0, keepdims=True)
 
-    # Validation set: 20 records with x between -10 and 10
-    x_valid = np.random.randint(20, size=(2, 20)) - 10
+    # Validation set: 100 such records with x between -10 and 10
+    x_valid = np.random.randint(20, size=(2, 100)) - 10
     y_valid = np.max(x_valid, axis=0, keepdims=True) - np.min(x_valid, axis=0, keepdims=True)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid)
@@ -106,14 +106,14 @@ def test_simple_classification():
     nn.add_layer(Linear(1, 1))
     nn.add_layer(Sigmoid())
 
-    # Training set: 100 records; each col of x is a random ints between 0 and 20, y = x > 10
+    # Training set: 1000 records; each col of x is a random ints between 0 and 20, y = x > 10
     threshold = 10
-    x_train = np.random.randint(2 * threshold, size=(1, 100))
-    y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
+    x_train = np.random.randint(2 * threshold, size=(1, 1000))
+    y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 1000)
 
-    # Validation set: 20 such records
-    x_valid = np.random.randint(2 * threshold, size=(1, 20))
-    y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 20)
+    # Validation set: 100 such records
+    x_valid = np.random.randint(2 * threshold, size=(1, 100))
+    y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .05)
 
@@ -126,15 +126,15 @@ def test_classification():
     nn.add_layer(Linear(6, 1))
     nn.add_layer(Sigmoid())
 
-    # Training set: 100 records; each col of x are two random ints between -40 and 40
+    # Training set: 1000 records; each col of x are two random ints between -40 and 40
     # y = if the sum of the ints is > 20
     threshold = 20
-    x_train = np.random.randint(4 * threshold, size=(2, 100)) - 2 * threshold
-    y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 100)
+    x_train = np.random.randint(4 * threshold, size=(2, 1000)) - 2 * threshold
+    y_train = (1 * (x_train.sum(axis=0, keepdims=True) > threshold)).reshape(1, 1000)
 
-    # Validation set: 20 such records
-    x_valid = np.random.randint(4 * threshold, size=(2, 10)) - 2 * threshold
-    y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 10)
+    # Validation set: 200 such records
+    x_valid = np.random.randint(4 * threshold, size=(2, 200)) - 2 * threshold
+    y_valid = (1 * (x_valid.sum(axis=0, keepdims=True) > threshold)).reshape(1, 200)
 
     train_and_test (nn, test_name, x_train, y_train, x_valid, y_valid, .05)
 

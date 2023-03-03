@@ -96,5 +96,5 @@ Up next:
 * Spend more time thinking about alternative regression loss functions
 * Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html. Implement these same test cases in that framework and compare.
 * Understand GPT architecture: https://jaykmody.com/blog/gpt-from-scratch/?utm_source=tldrnewsletter
-* Build something cool
+* Build something cool - start with a game agent, understand reinforced learning
 * Update linked in profile, make professional contacts
