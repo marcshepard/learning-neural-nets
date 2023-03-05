@@ -212,7 +212,11 @@ class NeuralNet:
             if len(self.loss_per_epoch) > self.max_epochs:
                 return False
 
-            # Run training over mini-batches of batch_size
+            # Run training over mini-batches of batch_size; shffle training data each epoch
+            # to avoid overfitting caused by using the same mini-batches each epoch
+            permutation = np.random.permutation(x_train.shape[1])
+            x_train = x_train[:, permutation]
+            y_train = y_train[:, permutation]
             for j in range(0, x_train.shape[1], batch_size):
                 # Update weights after processing a mini-batch
                 x_batch = x_train[:, j:j+batch_size]

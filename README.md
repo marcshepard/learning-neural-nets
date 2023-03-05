@@ -85,8 +85,9 @@ Here's how the above summary maps to the actual source code:
 
 Issues/thoughts:
 1) I've implemented an auto_train method eliminates a few hyper parameters and results in more efficient training:
-* Dynamic learning rate. This was a huge win as it got to a desired minimum much faster and without the need to tune a learning_rate hyper-paramer. The implementation starts with a relatively high rate (.05), but for each mini-batch, if the loss function doesn't decrease with the current learning rate, then cut it in half, readjust the weights, and try again until the loss drops. Then adjust the learning rate using exponential average of the new and old rates; the next mini-batch will start with that. 
-* Specify target loss rather than number of epochs. Another big win.
+* Dynamic learning rate. Starts with a relatively high rate (.05), but after adjusting weights for each mini-batch, if the loss function doesn't decrease for that mini-batch, cut the weight adjustment in half and try again. Idea is to make sure gradient decent didn't bypass the local minima by so much as to make loss increase. Then adjust the learning rate using exponential average of the new and old rates; the next mini-batch will start with that.
+* Specify target loss rather than number of epochs. Makes training much easier, since loss rate is the goal (not number of epochs)
+* Randomly shuffle the training data each epoch so we don't overfit on the mini-batches. This made a huge difference in some of the test cases (going from thousands of epochs needed to reach the target to a much smaller handful).
 2) At some point should make the linear layer's weight function configurable so folks can override the default, as it seems like different initializations yeild very different results.
 3) ReLU activation can sometimes make everything go to 0 depending on the weight initialization. Training with both negative and positive values helps fix this.
 4) The right loss function depents on the problem space. MSE OK for regressions, but when training a linear model like f(x) = 3x it will give wildly different gradients/errors for the same percent error depending on if the training data is near zero or far away.
