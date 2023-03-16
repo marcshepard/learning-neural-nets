@@ -91,9 +91,3 @@ Issues/thoughts:
 2) At some point should make the linear layer's weight function configurable so folks can override the default, as it seems like different initializations yeild very different results.
 3) ReLU activation can sometimes make everything go to 0 depending on the weight initialization. Training with both negative and positive values helps fix this.
 4) The right loss function depents on the problem space. MSE OK for regressions, but when training a linear model like f(x) = 3x it will give wildly different gradients/errors for the same percent error depending on if the training data is near zero or far away.
-
-Up next:
-* Learn pytorch: https://pytorch.org/tutorials/beginner/pytorch_with_examples.html. Implement these same test cases in that framework and compare.
-* Understand GPT architecture: https://jaykmody.com/blog/gpt-from-scratch/?utm_source=tldrnewsletter
-* Learn reinforced learning
-* Build something cool; image recognition app, or game agent.
