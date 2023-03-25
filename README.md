@@ -24,16 +24,13 @@ Prereqs:
 * torchvision (pip install torchvision)
 * matplotlib (pip install matplotlib)
 
-I sketched out how to do train a single linear layer on scratch paper and tested it, and then generalized it after reading these articles:
-1. https://en.wikipedia.org/wiki/Backpropagation
-2. https://towardsdatascience.com/lets-code-a-neural-network-in-plain-numpy-ae7e74410795
-
 # Background
-First; let's talk about the type of problems neural nets can solve. There are two types:
+First; let's talk about the type of problems neural nets can solve:
 * Classification - for given input, predict discreet valued output. For example, given an image of a hand-written digit(an nxn grid of color intensitites), which digit (0-9) is it? Every time you deposit a check, a neural net figures this out. Computer programs could not solve this prior to the invension of neural nets.
 * Regressions. These try to predict a continous numeric value from the input. For example, Zillow's zestimate tries to predict a houses value from inputs like square footage, # bedrooms, and zip code. Neural nets can solve these problems as well, but there are many alteranative methods.
+* And of course more recently for generative AI, such as LLM (large language models) such as ChatGPT.
 
-Because classic computer algorithms (where someone hand-crafts rules for how to map inputs to outputs) couldn't solve certain problems that humans can solve easily (such as image classification), the idea emerged to try to create a computer program that could simulate to some degree how the brain worked. Like the brain, some training of the network is needed to teach the network how to perform each task before it can do it on it's own reliably; and the more training the better it becomes. So the combination of a generic neural net + training replaces the need for a programmer to write specific algorithms (such as how to recognize a "9" in an image). With that in mind, let's talk about how real neurons work and motivated the architecture of artificial neural nets:
+Because classic computer algorithms (where someone hand-crafts rules for how to map inputs to outputs) couldn't solve certain problems that humans can solve easily (such as image classification or speach), the idea emerged to try to create a computer program that could simulate to some degree how the brain worked. Like the brain, some training of the network is needed to teach the network how to perform each task before it can do it on it's own reliably; and the more training the better it becomes. So the combination of a generic neural net + training replaces the need for a programmer to write specific algorithms (such as how to recognize a "9" in an image). With that in mind, let's talk about how real neurons work and motivated the architecture of artificial neural nets:
 1. How a real neuron works: https://qbi.uq.edu.au/brain/brain-anatomy/what-neuron. Synopsis: a neuron fires a brief output signal through it's axon if the input it gets (from other neuron's axons via it's dentrites) are above an activation threshold. Inputs are not equally weighted; some axon->dentrite connections are stronger than others, meaning an input from that neuron will more likely trigger activation. Biologically, creating, strengthening, or weakening neural connection is how we learn.
 2. How this maps to artificial neural nets: https://towardsdatascience.com/the-differences-between-artificial-and-biological-neural-networks-a8b46db828b7. Synopsis:
     * The network is a set of fully connected "layers" of neurons; so if a given layer has "m" neurons and the previous layer has "n" neurons, then the layer gets "n" inputs (one from each neuron in the previous layer) and produces "m" outputs for the next layer (one from each neuron)
