@@ -24,11 +24,11 @@ Prereqs:
 * torchvision (pip install torchvision)
 * matplotlib (pip install matplotlib)
 
-# Background
+# Why neural nets?
 First; let's talk about the type of problems neural nets can solve:
 * Classification - for given input, predict discreet valued output. For example, given an image of a hand-written digit(an nxn grid of color intensitites), which digit (0-9) is it? Every time you deposit a check, a neural net figures this out. Computer programs could not solve this prior to the invension of neural nets.
 * Regressions. These try to predict a continous numeric value from the input. For example, Zillow's zestimate tries to predict a houses value from inputs like square footage, # bedrooms, and zip code. Neural nets can solve these problems as well, but there are many alteranative methods.
-* And of course more recently for generative AI, such as LLM (large language models) such as ChatGPT.
+* Generative models, such as the LLM (large language model) that powers ChatGPT or stable diffusion that powers image generation tools like midjourney
 
 Because classic computer algorithms (where someone hand-crafts rules for how to map inputs to outputs) couldn't solve certain problems that humans can solve easily (such as image classification or speach), the idea emerged to try to create a computer program that could simulate to some degree how the brain worked. Like the brain, some training of the network is needed to teach the network how to perform each task before it can do it on it's own reliably; and the more training the better it becomes. So the combination of a generic neural net + training replaces the need for a programmer to write specific algorithms (such as how to recognize a "9" in an image). With that in mind, let's talk about how real neurons work and motivated the architecture of artificial neural nets:
 1. How a real neuron works: https://qbi.uq.edu.au/brain/brain-anatomy/what-neuron. Synopsis: a neuron fires a brief output signal through it's axon if the input it gets (from other neuron's axons via it's dentrites) are above an activation threshold. Inputs are not equally weighted; some axon->dentrite connections are stronger than others, meaning an input from that neuron will more likely trigger activation. Biologically, creating, strengthening, or weakening neural connection is how we learn.
