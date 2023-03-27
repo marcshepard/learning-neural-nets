@@ -161,7 +161,7 @@ class FashionMnist(NeuralNetwork):
         try:
             self.load_state_dict(torch.load(self.SAVE_FILE))
             return True
-        except FileNotFoundError:
+        except (RuntimeError, FileNotFoundError):
             return False
 
     def train_epochs(self, epochs: int):
