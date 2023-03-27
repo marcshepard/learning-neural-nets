@@ -20,9 +20,20 @@ Files:
 * vision_tests.py
 
 Prereqs:
-* pytorch (pip install numpy)
+* pytorch (pip install torch)
 * torchvision (pip install torchvision)
 * matplotlib (pip install matplotlib)
+
+## Text
+Overview: This was created so I could learn how to use PyTorch transformers for text generation.
+
+Files:
+* text.py
+* text_tests.py
+
+Prereqs:
+* pytorch (pip install torch)
+* torchvision (pip install torchdata)
 
 # Why neural nets?
 First; let's talk about the type of problems neural nets can solve:

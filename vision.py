@@ -1,14 +1,14 @@
 """
 vision.py - neural network code for image recognition built on pytorch (so I could learn)
 
-Prereqs: numpy, matplotlib, pytorch, pytorchvision
+Prereqs: matplotlib, torch, torchdata
 
 How to use: See the test code in vision_tests.py
 
 Goals and design:
-This code is largely a refactoring of what is in https://pytorch.org/tutorials/, but put into
-classes for easier reuse. It includes notes on how to configure CUDA for GPU support for faster
-pytorch processing if you have an NVIDIA graphics card. The main classes are:
+This code is based on https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html.
+It includes notes on how to configure CUDA to run tensors on NVIDA GPUs for (alegedly) faster
+processing. The main classes are:
 * NeuralNetwork - nn.model subclass that provides training and testing and code reuse
 * FashionMnist - NeuralNetwork subclass for manipulating the FashionMNIST dataset
 
