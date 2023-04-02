@@ -12,14 +12,12 @@ series on Coursera; it's a work in progress.
 Learnings from testing so far w NVIDIA 2060 GPU, 16GB RAM, 3GHZ 8 core i7-10700F CPU:
 * Adam optimizer is much faster than SGD.
 * GPU was much faster on deeper networks, but similar speeds on the simple networks.
-* Simple cnn accuracy caps at ~86% test, 89% test
-* Cnn accuracy caps at ~92% test, 98% test w 100 epochs, Adam, weight_decay=2e-5
+* Current CNN accuracy caps at ~91% test, 98% test w 100 epochs, Adam, weight_decay=2e-5
+* A simpler CNN also did 91% test accuracy (but only 95% train)
 
 TODO:
 Improve CNN to get test accuracy over 95% (current issue is overfitting)
 Things that may help:
-* Modify eval to show convolution matrix, pop pictures of biggest errors
-* Break train data into train and dev; shouldn't use test data for eval
 * Log various training runs
 * Try it in TensorFlow to compare/contrast.
 
@@ -34,55 +32,87 @@ import os
 import matplotlib.pyplot as plt
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import datasets
 from torchvision.transforms import ToTensor
+from torchmetrics.classification import MulticlassConfusionMatrix
 
 # Disable some pylint warnings; I like to use x, y, dx, dy, nn as variable names in this file
 # pylint: disable=invalid-name
+
+# Fix random seeds for reproducibility
+torch.manual_seed(12)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed(12)
+    torch.backends.cudnn.deterministic=True
+
+# Enable tracing by default
+trace_callback = print
+def trace (*args):
+    """Trace callback"""
+    trace_callback(*args)
 
 # Configure device to use for tensors (CPU or GPU).
 # If your PC has a GPU, you'll need to perform these steps to allow PyTorch to use it:
 # 1) Install CUDA: https://developer.nvidia.com/cuda-downloads
 # 2) Make sure your installed PyTorch is compiled for cuda. https://pytorch.org/get-started/locally/
 #    As of this writing, pytorch doesn't run on Python 3.11; so I also had to downgrade to 3.10
-
-trace_callback = print
-def trace (*args):
-    """Trace callback"""
-    trace_callback(*args)
-
 trace(f'PyTorch version: {torch.__version__}')
 device = "cuda" if torch.cuda.is_available() else "cpu"
 trace(f"Using {device} device")
-if device == "cuda":
+if torch.cuda.is_available():
     trace(f'Device Name: {torch.cuda.get_device_name()}')
 
-# From https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html
-# Base class for neural network models
-class NeuralNetwork(nn.Module):
-    """Added some common training and testing code for reuse"""
-    def __init__(self, model : torch.nn.Module, loss_fn : torch.nn.modules.loss._Loss):
+# Class to hold generic PyTorch training and eval logic for various configurations
+# Currently only the network layers and weight decay are configurable;
+# The optimizer (Adam) and loss function (CrossEntropy) are hard-coded
+class FashionMnist(nn.Module):
+    """Neural network for the FashionMNIST dataset"""
+    CLASSES = [
+        "T-shirt/top",
+        "Trouser",
+        "Pullover",
+        "Dress",
+        "Coat",
+        "Sandal",
+        "Shirt",
+        "Sneaker",
+        "Bag",
+        "Ankle boot",
+    ]
+
+    SAVE_DIR = "saved_models"
+
+    def __init__(self, model_name : str, model : torch.nn.Module, weight_decay : float = 2e-5, \
+                 batch_size : int = 128):
         super().__init__()
         self.model = model
-        self.loss_fn = loss_fn
-        self.optimizer = torch.optim.Adam(model.parameters(), weight_decay=2e-5)
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.optimizer = torch.optim.Adam(model.parameters(), weight_decay=weight_decay)
         self.loss_per_epoch = []
         self.trace_debug = True
+        self.batch_size = batch_size
+        self.model_name = model_name
         self.to(device)
+
+    @property
+    def SAVE_FILE(self):
+        """Return the save file name"""
+        return os.path.join(self.SAVE_DIR, "FashionMnist_" + self.model_name + ".pt")
 
     def forward(self, x):
         """Forward pass"""
         logits = self.model(x)
         return logits
 
-    def auto_train (self, train : DataLoader, test : DataLoader, epochs : int):
+    def train_epochs(self, epochs: int):
         """Train the model"""
+        dev, train = self.get_dev_train_dataloaders(self.batch_size)
         self.loss_per_epoch = []
 
         for e in range(epochs):
-            loss_this_epoch = 0
-            accuracy_this_epoch = 0
+            avg_loss = 0      # Avg loss on training data per this epoch
+            avg_accuracy = 0  # Avg accuracy on training data per this epoch
             self.model.train()
             for X, y in train:
                 X, y = X.to(device), y.to(device)
@@ -97,21 +127,22 @@ class NeuralNetwork(nn.Module):
                 self.optimizer.step()
 
                 # Adjust loss_this_epoch
-                loss_this_epoch += loss.item()
+                avg_loss += loss.item()
                 # Adjust accuracy_this_epoch
-                accuracy_this_epoch += (pred.argmax(1) == y).type(torch.float).sum().item() # pylint: disable=no-member
-        
+                avg_accuracy += (pred.argmax(1) == y).type(torch.float).sum().item() # pylint: disable=no-member
+
             # Compute total loss for the epoch
-            loss_this_epoch /= len(train)
+            avg_loss /= len(train)
             # Compute total accuracy for the epoch
-            accuracy_this_epoch *= 100 / len(train.dataset)
+            avg_accuracy *= 100 / len(train.dataset)
             if self.trace_debug:
-                trace (f"Epoch: {e}. Avg mini-batch data loss: {loss_this_epoch:.2f}, Accuracy: {accuracy_this_epoch:.2f}")
+                trace (f"Epoch {e}:")
+                print (f"\tAvg train loss: {avg_loss:.2f}, Accuracy: {avg_accuracy:.2f}")
                 self.model.eval()
-                test_loss, test_accuracy = self.test(test)
-                trace (f"\tTest data loss: {test_loss:.2f}, Accuracy: {test_accuracy:.2f}")
+                dev_loss, dev_accuracy = self.test(dev)
+                trace (f"\tDev loss      : {dev_loss:.2f}, Accuracy: {dev_accuracy:.2f}")
                 self.model.train()
-            self.loss_per_epoch.append(loss_this_epoch)
+            self.loss_per_epoch.append(avg_loss)
 
     def test (self, test : DataLoader):
         """Test the model - similar to predict, but gather some stats"""
@@ -132,26 +163,6 @@ class NeuralNetwork(nn.Module):
         with torch.no_grad():
             return self.model(x)
 
-class FashionMnist(NeuralNetwork):
-    """Neural network for the FashionMNIST dataset"""
-    CLASSES = [
-        "T-shirt/top",
-        "Trouser",
-        "Pullover",
-        "Dress",
-        "Coat",
-        "Sandal",
-        "Shirt",
-        "Sneaker",
-        "Bag",
-        "Ankle boot",
-    ]
-
-    def __init__(self, model : torch.nn.Module, save_file : str):
-        super().__init__(model, nn.CrossEntropyLoss())
-        self.SAVE_DIR = "models"
-        self.SAVE_FILE = os.path.join(self.SAVE_DIR, save_file)
-
     @staticmethod
     def get_test_dataloader ():
         """Download test data from open datasets."""
@@ -163,8 +174,10 @@ class FashionMnist(NeuralNetwork):
         )
         return DataLoader(test_data, batch_size=len(test_data))
 
+    # Get dev and train dataloaders; dev is 10,000 records from the training set
+    # And used to validate the model on unseen data and tune hyperparameters
     @staticmethod
-    def get_train_dataloader():
+    def get_dev_train_dataloaders(train_batch_size : int = None):
         """Download training data from open datasets."""
         training_data = datasets.FashionMNIST(
             root="data",
@@ -172,7 +185,14 @@ class FashionMnist(NeuralNetwork):
             download=True,
             transform=ToTensor(),
         )
-        return DataLoader(training_data, batch_size=64)
+        dev_set_size = 5000 # Carve out some data for validation
+        train_set_size = len(training_data) - dev_set_size # Use the rest for training
+        dev_data, train_data = random_split(training_data, [dev_set_size, train_set_size])
+        dev_loader = DataLoader(dev_data, batch_size=len(dev_data))
+        if train_batch_size is None:
+            train_batch_size = len(train_data)
+        train_loader = DataLoader(train_data, batch_size=train_batch_size)
+        return dev_loader, train_loader
 
     def save(self):
         """Save the model to a file"""
@@ -188,17 +208,15 @@ class FashionMnist(NeuralNetwork):
         except (RuntimeError, FileNotFoundError):
             return False
 
-    def train_epochs(self, epochs: int):
-        """Train the model"""
-        return super().auto_train(self.get_train_dataloader(), self.get_test_dataloader(), epochs)
-
     def show_images(self, images, labels):
         """Show a set of images and their correct vs predicted labels"""
         for x, y in zip(images, labels):
             x = x.unsqueeze(0)   # Add batch dimension to x
             with torch.no_grad():
-                pred = self(x.to(device))
-                label = "Predicted: " + self.CLASSES[pred.argmax()] + ", Actual: " + self.CLASSES[y]
+                pred = self(x.to(device)).argmax()
+                if pred == y:
+                    continue
+                label = "Predicted: " + self.CLASSES[pred] + ", Actual: " + self.CLASSES[y]
                 plt.title(label)
                 plt.imshow(x.squeeze(), cmap="gray")
                 plt.pause(3)
@@ -215,10 +233,30 @@ class FashionMnist(NeuralNetwork):
 
     def eval(self):
         """Evaluate the model"""
+        dev_data, train_data = self.get_dev_train_dataloaders(self.batch_size)
         test_data = self.get_test_dataloader()
-        loss, accuracy = self.test(test_data)
-        trace (f"Loss: {loss}, Accuracy = {accuracy}%")
+        for name, data in [("Train", train_data), ("Dev", dev_data), ("Test", test_data)]:
+            loss, accuracy = self.test(data)
+            trace (f"{name} loss: {loss}, Accuracy = {accuracy}%")
+
+        # Get confusion matrix for train_data
+        y_actual = torch.tensor([], dtype=torch.long)   # pylint: disable=no-member
+        y_pred = torch.tensor([], dtype=torch.long)
+        self.model.eval()
+        with torch.no_grad():
+            for X, y in train_data:
+                X = X.to(device)
+                y_hat = self.model(X).to("cpu")
+                y_actual = torch.cat((y_actual, y), 0)
+                y_pred = torch.cat((y_pred, y_hat.argmax(1)), 0)
+        cm_metric = MulticlassConfusionMatrix (len(self.CLASSES))
+        cm = cm_metric(y_pred, y_actual)
+        trace ("Confusion matrix for train data")
+        trace (f"Classes: {self.CLASSES}")
+        trace (cm)
+
         if len(self.loss_per_epoch) > 0:
+            trace ("Training loss per epoch...")
             self.plot_loss()
 
         test_images, test_labels = next(iter(test_data))
@@ -238,8 +276,12 @@ class FashionMnist(NeuralNetwork):
         for name, param in self.named_parameters():
             trace(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
 
+
+# Testing code
 SAVE_MODEL = False  # Save model and load previously saved model (or start from scratch)?
 EPOCHS = 99         # Number of epochs to train
+NAME = "cnn"
+BATCH_SIZE = 128
 
 networks = {
     # Accuracy: 89, 86
@@ -296,9 +338,7 @@ networks = {
 }
 
 
-NAME = "cnn"
-
-nn = FashionMnist(networks[NAME], "fashion_mnist_" + NAME + ".pth")
+nn = FashionMnist(NAME, networks[NAME], batch_size=BATCH_SIZE)
 print (f"Testing FashionMNIST {NAME} neural network")
 if SAVE_MODEL and nn.load():
     print ("Loaded previously trained model:", nn.SAVE_FILE)
@@ -307,6 +347,7 @@ START = datetime.now()
 print (f"Training for {EPOCHS} epochs, be patient...")
 nn.train_epochs(EPOCHS)
 print (f"Training took {datetime.now() - START}")
+nn.eval()
 
 if SAVE_MODEL:
     nn.save()
