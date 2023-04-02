@@ -3,23 +3,33 @@ vision.py - neural network code for image recognition built on pytorch (so I cou
 
 Prereqs: matplotlib, torch, torchdata
 
-How to use: See the test code in vision_tests.py
-
 Goals and design:
-This code is based on https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html.
-It includes notes on how to configure CUDA to run tensors on NVIDA GPUs for (alegedly) faster
-processing. The main classes are:
-* NeuralNetwork - nn.model subclass that provides training and testing and code reuse
-* FashionMnist - NeuralNetwork subclass for manipulating the FashionMNIST dataset
+Initially based on https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html,
+which constructs a basic image classifier for the FashionMNISTA dataset with poor performance,
+I've since started optimizations, adding CNNs and incorporating ideas from Andrew Ng's Deep Learning
+series on Coursera; it's a work in progress.
 
-vision_test.py uses FashionMnist in a couple of ways:
-1) After configuring it as a simple feedforward neural network with just linear and relu layers (and
-   a final signmoid layer for classification). This path is the refactored version of what is in
-   https://pytorch.org/tutorials/beginner/basics/quickstart_tutorial.html.
-2) After configuring it as a convolutional neural network with convolutions and pooling. This was
-   simple to build reusing the refactored code above and I didn't use any particular tutorial.
+Learnings from testing so far w NVIDIA 2060 GPU, 16GB RAM, 3GHZ 8 core i7-10700F CPU:
+* Adam optimizer is much faster than SGD.
+* GPU was much faster on deeper networks, but similar speeds on the simple networks.
+* Simple cnn accuracy caps at ~86% test, 89% test
+* Cnn accuracy caps at ~92% test, 98% test w 100 epochs, Adam, weight_decay=2e-5
+
+TODO:
+Improve CNN to get test accuracy over 95% (current issue is overfitting)
+Things that may help:
+* Modify eval to show convolution matrix, pop pictures of biggest errors
+* Break train data into train and dev; shouldn't use test data for eval
+* Log various training runs
+* Try it in TensorFlow to compare/contrast.
+
+Some notes: In Pytorch, each row of input is a record (vs backprop.py which uses colums).
+Each row of weights is a neuron (same as backprop.py).
+so math for linear layer l(x) = x * w.T + b (vs neural_net.py's l(x) = w * x + b).
+It's weight initialization is rand(-sqrt(k), sqrt(k)) where k = 1/# inputs
 """
 
+from datetime import datetime
 import os
 import matplotlib.pyplot as plt
 import torch
@@ -56,7 +66,7 @@ class NeuralNetwork(nn.Module):
         super().__init__()
         self.model = model
         self.loss_fn = loss_fn
-        self.optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(model.parameters(), weight_decay=2e-5)
         self.loss_per_epoch = []
         self.trace_debug = True
         self.to(device)
@@ -71,6 +81,8 @@ class NeuralNetwork(nn.Module):
         self.loss_per_epoch = []
 
         for e in range(epochs):
+            loss_this_epoch = 0
+            accuracy_this_epoch = 0
             self.model.train()
             for X, y in train:
                 X, y = X.to(device), y.to(device)
@@ -84,10 +96,22 @@ class NeuralNetwork(nn.Module):
                 loss.backward()
                 self.optimizer.step()
 
-            loss, accuracy = self.test(test)
+                # Adjust loss_this_epoch
+                loss_this_epoch += loss.item()
+                # Adjust accuracy_this_epoch
+                accuracy_this_epoch += (pred.argmax(1) == y).type(torch.float).sum().item() # pylint: disable=no-member
+        
+            # Compute total loss for the epoch
+            loss_this_epoch /= len(train)
+            # Compute total accuracy for the epoch
+            accuracy_this_epoch *= 100 / len(train.dataset)
             if self.trace_debug:
-                trace (f"Epoch: {e}, Loss: {loss}, Accuracy: {accuracy}%")
-            self.loss_per_epoch.append(loss)
+                trace (f"Epoch: {e}. Avg mini-batch data loss: {loss_this_epoch:.2f}, Accuracy: {accuracy_this_epoch:.2f}")
+                self.model.eval()
+                test_loss, test_accuracy = self.test(test)
+                trace (f"\tTest data loss: {test_loss:.2f}, Accuracy: {test_accuracy:.2f}")
+                self.model.train()
+            self.loss_per_epoch.append(loss_this_epoch)
 
     def test (self, test : DataLoader):
         """Test the model - similar to predict, but gather some stats"""
@@ -213,3 +237,77 @@ class FashionMnist(NeuralNetwork):
         trace(f"Model structure: {self}\n\n")
         for name, param in self.named_parameters():
             trace(f"Layer: {name} | Size: {param.size()} | Values : {param[:2]} \n")
+
+SAVE_MODEL = False  # Save model and load previously saved model (or start from scratch)?
+EPOCHS = 99         # Number of epochs to train
+
+networks = {
+    # Accuracy: 89, 86
+    "simple" : nn.Sequential(
+        nn.Flatten(),
+        nn.Linear(28*28, 512),
+        nn.ReLU(),
+        nn.Linear(512, 512),
+        nn.ReLU(),
+        nn.Linear(512, 10),
+        nn.Softmax(dim=1)),
+    # Accuracy: 95, 91
+    "simple_cnn" : nn.Sequential(           # Input size:  1x28x28
+        nn.Conv2d(1, 6, kernel_size=3),     # Output: 6x26x26; 26=28-3+1
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2),        # Output: 6x13x13; 13=26/2
+        nn.Conv2d(6, 12, kernel_size=3),    # Output: 12x11x11; 11=13-3+1
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2),        # Output: 12x5x5; 5=11/2
+        nn.Flatten(),
+        nn.Linear(12*5*5, 10),
+        nn.Softmax(dim=1)),
+    # Accuracy: 98, 91 after 100 epochs w weight_decay 2e-5
+    "cnn" : nn.Sequential(                  # Input size:  1x28x28
+        nn.Conv2d(1, 32, kernel_size=3),    # Output: 32x26x26; 26=28-3+1
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2),        # Output: 32x13x13; 13=26/2
+        nn.Conv2d(32, 64, kernel_size=3),   # Output: 64x11x11; 11=13-3+1
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2),        # Output: 64x5x5; 5=11/2
+        nn.Flatten(),
+        nn.BatchNorm1d(64*5*5),
+        nn.Linear(64*5*5, 128),
+        nn.ReLU(),
+        nn.Linear(128, 10),
+        nn.Softmax(dim=1)),
+    # Accuracy: ???
+    "cnn_last" : nn.Sequential(             # Input size:  1x28x28
+        nn.Conv2d(1, 32, kernel_size=3),    # Output: 32x26x26; 26=28-3+1
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2),        # Output: 32x13x13; 13=26/2
+        nn.Conv2d(32, 64, kernel_size=3),   # Output: 64x11x11; 11=13-3+1
+        nn.ReLU(),
+        nn.MaxPool2d(kernel_size=2),        # Output: 64x5x5; 5=11/2
+        nn.Flatten(),
+        nn.BatchNorm1d(64*5*5),
+        nn.Linear(64*5*5, 256),
+        nn.ReLU(),
+        nn.Dropout1d(0.05),
+        nn.Linear(256, 128),
+        nn.ReLU(),
+        nn.Linear(128, 10),
+        nn.Softmax(dim=1)),
+}
+
+
+NAME = "cnn"
+
+nn = FashionMnist(networks[NAME], "fashion_mnist_" + NAME + ".pth")
+print (f"Testing FashionMNIST {NAME} neural network")
+if SAVE_MODEL and nn.load():
+    print ("Loaded previously trained model:", nn.SAVE_FILE)
+
+START = datetime.now()
+print (f"Training for {EPOCHS} epochs, be patient...")
+nn.train_epochs(EPOCHS)
+print (f"Training took {datetime.now() - START}")
+
+if SAVE_MODEL:
+    nn.save()
+    print ("Saved model:", nn.SAVE_FILE)
