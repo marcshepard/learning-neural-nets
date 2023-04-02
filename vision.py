@@ -18,6 +18,7 @@ Learnings from testing so far w NVIDIA 2060 GPU, 16GB RAM, 3GHZ 8 core i7-10700F
 TODO:
 Improve CNN to get test accuracy over 95% (current issue is overfitting)
 Things that may help:
+* Add dev loss to the train loss plot
 * Log various training runs
 * Try it in TensorFlow to compare/contrast.
 
@@ -39,6 +40,8 @@ from torchmetrics.classification import MulticlassConfusionMatrix
 
 # Disable some pylint warnings; I like to use x, y, dx, dy, nn as variable names in this file
 # pylint: disable=invalid-name
+# Pylint can't seem to find a number of torch members, so disable that warning
+# pylint: disable=no-member
 
 # Fix random seeds for reproducibility
 torch.manual_seed(12)
@@ -93,6 +96,8 @@ class FashionMnist(nn.Module):
         self.trace_debug = True
         self.batch_size = batch_size
         self.model_name = model_name
+        self.train_loader = None
+        self.dev_loader = None
         self.to(device)
 
     @property
@@ -144,18 +149,18 @@ class FashionMnist(nn.Module):
                 self.model.train()
             self.loss_per_epoch.append(avg_loss)
 
-    def test (self, test : DataLoader):
+    def test (self, data : DataLoader):
         """Test the model - similar to predict, but gather some stats"""
         self.model.eval()
         loss = 0
         correct = 0
         with torch.no_grad():
-            for X, y in test:
+            for X, y in data:
                 X, y = X.to(device), y.to(device)
                 pred = self.model(X)
                 loss += self.loss_fn(pred, y).item()
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item() # pylint: disable=no-member
-        return loss / len(test), correct * 100 / len(test.dataset)
+        return loss / len(data), correct * 100 / len(data.dataset)
 
     def predict (self, x : torch.Tensor):
         """predicting the output for given input"""
@@ -176,23 +181,26 @@ class FashionMnist(nn.Module):
 
     # Get dev and train dataloaders; dev is 10,000 records from the training set
     # And used to validate the model on unseen data and tune hyperparameters
-    @staticmethod
-    def get_dev_train_dataloaders(train_batch_size : int = None):
-        """Download training data from open datasets."""
-        training_data = datasets.FashionMNIST(
-            root="data",
-            train=True,
-            download=True,
-            transform=ToTensor(),
-        )
-        dev_set_size = 5000 # Carve out some data for validation
-        train_set_size = len(training_data) - dev_set_size # Use the rest for training
-        dev_data, train_data = random_split(training_data, [dev_set_size, train_set_size])
-        dev_loader = DataLoader(dev_data, batch_size=len(dev_data))
-        if train_batch_size is None:
-            train_batch_size = len(train_data)
-        train_loader = DataLoader(train_data, batch_size=train_batch_size)
-        return dev_loader, train_loader
+    def get_dev_train_dataloaders(self, train_batch_size : int = None):
+        """Get the dev and train dataloaders"""
+        if self.train_loader is None:
+            #Download training data from open datasets.
+            training_data = datasets.FashionMNIST(
+                root="data",
+                train=True,
+                download=True,
+                transform=ToTensor(),
+            )
+            dev_set_size = 5000 # Carve out some data for validation
+            train_set_size = len(training_data) - dev_set_size # Use the rest for training
+            dev_data, train_data = random_split(training_data, [dev_set_size, train_set_size])
+            self.dev_loader = DataLoader(dev_data, batch_size=len(dev_data))
+            if train_batch_size is None:
+                train_batch_size = len(train_data)
+            self.train_loader = DataLoader(train_data, batch_size=train_batch_size)
+    
+        return self.dev_loader, self.train_loader
+    
 
     def save(self):
         """Save the model to a file"""
@@ -223,34 +231,15 @@ class FashionMnist(nn.Module):
                 if not plt.fignum_exists(1):
                     break
 
-    def show_image(self, img, label):
-        """Show a single image and label"""
-        plt.figure(figsize=(2, 2))
-        plt.title(label)
-        plt.axis("off")
-        plt.imshow(img.squeeze(), cmap="gray")
-        plt.show(block=False)
-
     def eval(self):
         """Evaluate the model"""
         dev_data, train_data = self.get_dev_train_dataloaders(self.batch_size)
         test_data = self.get_test_dataloader()
         for name, data in [("Train", train_data), ("Dev", dev_data), ("Test", test_data)]:
             loss, accuracy = self.test(data)
-            trace (f"{name} loss: {loss}, Accuracy = {accuracy}%")
+            trace (f"{name} loss: {loss:.2f}, Accuracy = {accuracy:.2f}%")
 
-        # Get confusion matrix for train_data
-        y_actual = torch.tensor([], dtype=torch.long)   # pylint: disable=no-member
-        y_pred = torch.tensor([], dtype=torch.long)
-        self.model.eval()
-        with torch.no_grad():
-            for X, y in train_data:
-                X = X.to(device)
-                y_hat = self.model(X).to("cpu")
-                y_actual = torch.cat((y_actual, y), 0)
-                y_pred = torch.cat((y_pred, y_hat.argmax(1)), 0)
-        cm_metric = MulticlassConfusionMatrix (len(self.CLASSES))
-        cm = cm_metric(y_pred, y_actual)
+        cm = self.get_confusion_matrix(train_data)
         trace ("Confusion matrix for train data")
         trace (f"Classes: {self.CLASSES}")
         trace (cm)
@@ -262,6 +251,20 @@ class FashionMnist(nn.Module):
         test_images, test_labels = next(iter(test_data))
         self.show_images(test_images, test_labels)
 
+    def get_confusion_matrix(self, data : DataLoader):
+        """Get the confusion matrix for the given data"""
+        y_actual = torch.tensor([], dtype=torch.long)
+        y_pred = torch.tensor([], dtype=torch.long)
+        self.model.eval()
+        with torch.no_grad():
+            for X, y in data:
+                X = X.to(device)
+                y_hat = self.model(X).to("cpu")
+                y_actual = torch.cat((y_actual, y), 0)
+                y_pred = torch.cat((y_pred, y_hat.argmax(1)), 0)
+        cm_metric = MulticlassConfusionMatrix (len(self.CLASSES))
+        return cm_metric(y_pred, y_actual)
+
     def plot_loss(self):
         """Show loss per epoch"""
         plt.plot(self.loss_per_epoch)
@@ -269,6 +272,7 @@ class FashionMnist(nn.Module):
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.show()
+        plt.pause(3)
 
     def print_model(self):
         """Print the model structure and parameters"""
@@ -279,7 +283,7 @@ class FashionMnist(nn.Module):
 
 # Testing code
 SAVE_MODEL = False  # Save model and load previously saved model (or start from scratch)?
-EPOCHS = 99         # Number of epochs to train
+EPOCHS = 5         # Number of epochs to train
 NAME = "cnn"
 BATCH_SIZE = 128
 
