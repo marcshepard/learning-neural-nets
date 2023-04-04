@@ -4,6 +4,12 @@ vision_tf.py - neural network code for image recognition built on tensorflow (so
 Prereqs: tensorflow
 
 Goals and design: Compare this approach to pytorch
+
+Learning so far: 
+* 1/10th as much code as pytorch
+* vastly superior training speed
+* vastly superior accuracy (98%!)
+I'm surely missing something in pytorch, but won't continue with it given the poor ROI.
 """
 import tensorflow as tf
 
@@ -17,12 +23,20 @@ model = tf.keras.models.Sequential([
   tf.keras.layers.Dense(10)
 ])
 
-loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-
 model.compile(optimizer='adam',
-              loss=loss_fn,
+              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
               metrics=['accuracy'])
 
+print ("Model summary:")
+model.summary()
+
+print ("\nModel training:")
 model.fit(x_train, y_train, epochs=5)
 
+print ("\nModel evaluation")
 model.evaluate(x_test,  y_test, verbose=2)
+
+print ("\Confusion matrix")
+y_pred = model.predict(x_train).argmax(axis=1)
+cm = tf.math.confusion_matrix(labels=y_train, predictions=y_pred)
+print (cm)
