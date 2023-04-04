@@ -5,9 +5,13 @@ I created this project to learn neural nets at a deeper level. This section is a
 Basic neural net layers and test code built on numpy to learn how neural networks are trained from basic principals (calculus and matrix arithmatic).
 Prereqs: numpy, matplotlib
 
-## vision.py
+## vision_pt.py
 FashionMNISTA classifier built with PyTorch to learn PyTorch, CNNs, and practice optimizing on a real framework.
 Prereqs: torch, matplotlib
+
+## vision_tf.py
+FashionMNISTA classifier built with tensorflow to compare to pt
+Prereqs: tensorflow
 
 # Why neural nets?
 First; let's talk about the type of problems neural nets can solve:
