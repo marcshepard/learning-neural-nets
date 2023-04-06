@@ -6,6 +6,7 @@ Prereqs: tensorflow
 Goals and design: Compare this approach to pytorch
 """
 import tensorflow as tf
+from tensorflow.keras.regularizers import l2
 import matplotlib.pyplot as plt
 
 # Load the Fashion MNIST training and test data sets
@@ -36,29 +37,19 @@ if False:
       plt.xlabel(class_names[y_train[i]])
   plt.show()
 
+# Accuracy after 10 epochs: 98.34, 92.56, 92.14 train/dev/test. Overfitting.
+# Shirts are hardest to classify (vs t-shirt, pullover, coat, dress).
+# Adding another Conv2D layers didn't help. Adding another dense layer didn't help.
 model = tf.keras.models.Sequential([
-  tf.keras.layers.Flatten(input_shape=(28, 28)),
-  tf.keras.layers.Dense(128, activation='relu'),
-  tf.keras.layers.Dropout(0.2),
-  tf.keras.layers.Dense(10)
-])
-
-from tensorflow.keras.regularizers import l2
-factor = .002
-
-regularization = tf.keras.regularizers.l2(0.001)
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', kernel_regularizer=l2(factor), input_shape=(28, 28, 1)),
+    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'),
     tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(factor)),
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
     tf.keras.layers.MaxPooling2D((2, 2)),
     tf.keras.layers.Flatten(),
     tf.keras.layers.BatchNormalization(),
-    tf.keras.layers.Dense(256, kernel_regularizer=l2(factor), activation='relu'),
-    tf.keras.layers.Dropout(0.2),
-    tf.keras.layers.Dense(128, kernel_regularizer=l2(factor), activation='relu'),
-    #tf.keras.layers.Dropout(0.2),
-    tf.keras.layers.Dense(10, kernel_regularizer=l2(factor))
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dropout(0.3),
+    tf.keras.layers.Dense(10)
 ])
 
 model.compile(optimizer='adam',
@@ -69,7 +60,7 @@ print ("Model summary:")
 model.summary()
 
 print ("\nModel training:")
-history = model.fit(x_train, y_train, epochs=50, validation_data=(x_val, y_val), batch_size=128)
+history = model.fit(x_train, y_train, epochs=10, validation_data=(x_val, y_val), batch_size=128)
 # Graph the training and validation accuracy/loss
 plt.figure(figsize=(8, 8))
 plt.subplot(2, 1, 1)
@@ -98,9 +89,9 @@ train_loss, train_accuracy = model.evaluate(x_train, y_train, verbose=0)
 val_loss,   val_accuracy   = model.evaluate(x_val,   y_val, verbose=0)
 test_loss,  test_accuracy  = model.evaluate(x_test,  y_test, verbose=0)
 print ("Data set\tLoss\tAccuracy")
-print (f"Train\t\t{train_loss:.2f}\t{train_accuracy:.2f}")
-print (f"Validate\t{val_loss:.2f}\t{val_accuracy:.2f}")
-print (f"Test\t\t{test_loss:.2f}\t{test_accuracy:.2f}")
+print (f"Train\t\t{train_loss:.2f}\t{train_accuracy*100:.2f}")
+print (f"Validate\t{val_loss:.2f}\t{val_accuracy*100:.2f}")
+print (f"Test\t\t{test_loss:.2f}\t{test_accuracy*100:.2f}")
 
 print ("\nConfusion matrix")
 y_pred = model.predict(x_train).argmax(axis=1)
