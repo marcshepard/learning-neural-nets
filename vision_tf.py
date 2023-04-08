@@ -6,7 +6,7 @@ Prereqs: tensorflow
 Goals and design: Compare this approach to pytorch
 """
 import tensorflow as tf
-from tensorflow.keras.regularizers import l2
+#from tensorflow.keras.regularizers import l2
 import matplotlib.pyplot as plt
 
 # Load the Fashion MNIST training and test data sets
@@ -26,16 +26,17 @@ print ("Classes: ", class_names)
 print ("Training data shape: ", x_train.shape)
 print ("Test data shape: ", x_test.shape)
 
-if False:
-  plt.figure(figsize=(10,10))
-  for i in range(25):
-      plt.subplot(5,5,i+1)
-      plt.xticks([])
-      plt.yticks([])
-      plt.grid(False)
-      plt.imshow(x_train[i], cmap=plt.cm.binary)
-      plt.xlabel(class_names[y_train[i]])
-  plt.show()
+def plot_images(x, y, rows=5, cols=5, figsize=(10,10)):
+    """Plot a grid of rows x cols images, labeled from y and classes"""
+    plt.figure(figsize=figsize)
+    for i in range(rows * cols):
+        plt.subplot(rows, cols, i+1)
+        plt.xticks([])
+        plt.yticks([])
+        plt.grid(False)
+        plt.imshow(x[i], cmap=plt.cm.binary)  # pylint: disable=no-member
+        plt.xlabel(class_names[y[i]])
+    plt.show()
 
 # Accuracy after 10 epochs: 98.34, 92.56, 92.14 train/dev/test. Overfitting.
 # Shirts are hardest to classify (vs t-shirt, pullover, coat, dress).
@@ -45,12 +46,32 @@ model = tf.keras.models.Sequential([
     tf.keras.layers.MaxPooling2D((2, 2)),
     tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
     tf.keras.layers.MaxPooling2D((2, 2)),
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
     tf.keras.layers.Flatten(),
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Dense(256, activation='relu'),
     tf.keras.layers.Dropout(0.3),
-    tf.keras.layers.Dense(10)
+    tf.keras.layers.Dense(10), 
 ])
+
+"""
+# Alternative using the functional API
+def create_model():
+  input_img = tf.keras.Input(shape=(28, 28, 1))
+  x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
+  x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+  x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+  x = tf.keras.layers.MaxPooling2D((2, 2))(x)
+  x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+  x = tf.keras.layers.Flatten()(x)
+  x = tf.keras.layers.BatchNormalization()(x)
+  x = tf.keras.layers.Dense(256, activation='relu')(x)
+  x = tf.keras.layers.Dropout(0.3)(x)
+  x = tf.keras.layers.Dense(10)(x)
+  model = tf.keras.Model(inputs=input_img, outputs=x)
+  return model
+model = create_model()
+"""
 
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -60,7 +81,7 @@ print ("Model summary:")
 model.summary()
 
 print ("\nModel training:")
-history = model.fit(x_train, y_train, epochs=10, validation_data=(x_val, y_val), batch_size=128)
+history = model.fit(x_train, y_train, epochs=10, validation_data=(x_val, y_val), batch_size=256) # pylint: disable=invalid-name
 # Graph the training and validation accuracy/loss
 plt.figure(figsize=(8, 8))
 plt.subplot(2, 1, 1)
@@ -82,7 +103,6 @@ plt.ylim([0,1.0])
 plt.title('Training and Validation Loss')
 plt.xlabel('epoch')
 plt.show(block = True)
-
 
 print ("\nModel evaluation")
 train_loss, train_accuracy = model.evaluate(x_train, y_train, verbose=0)
