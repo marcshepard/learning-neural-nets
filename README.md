@@ -74,3 +74,26 @@ Multi-task learning: If you need to make multiple independent predictions from t
 Chained models: Sometimes it makes sense to have a single neural net to solve an entire problem end-to-end (e.g, audio -> transcription). Other times it makes more sense to chain together separate networks (e.g, image -> face -> employee).
 * Use chained models if there are large amounts of differet training examples for each component. Or if there is less data. Or if there are useful already designed components that can be leveraged.
 * Use an E2E model otherwise; it's often better 
+
+## Class #4: CNNS
+Lots of discussion on how conv and max-pool operations work not repeated here.
+Vanilla architecture:
+* Scale input images to 0-1 before input to network
+* A few layers of (conv + max_pool + relu)
+* A few layers of vanilla connected layers (might do batch norm input)
+
+Key insights:
+* Use conv padding="same" to preserve impact of edge pixels and to not cause problems with deep networks
+
+Variants:
+* Resnet: To solve the problem of vanishing/exploding gradients in deep neural nets, can add previous layer output to next layers output
+* Inception: To solve problem of "which convulution is most important", create a layer that tries them all and let the network decide.
+   * Inception layer output has same h,w, but channels are a "stack" of different convolution sizes + max pool
+   * Need padding = "same" for all so things fit. Stride = 1 for max_pool
+   * To reduce computation, add 1x1x<small number of channels> conv before each regualar conv, this "bottleneck" reduces dimension, picks most important features, reduces computations. Can add a 1x1 conv after maxpool to get the desired channels for that part.
+   Inception network has multiple inception layers stacked, a softmax output from each layer to create a regularizing effect
+   Invented by google. They called it googLeNet (not to LeNet). Inception named after the Sci fi movie:)
+
+
+
+
