@@ -5,38 +5,31 @@ Prereqs: tensorflow
 
 Goals and design: Compare this approach to pytorch
 """
+
+# pylint: disable=invalid-name, too-many-arguments, line-too-long, too-many-instance-attributes
+
 import tensorflow as tf
-#from tensorflow.keras.regularizers import l2
-import matplotlib.pyplot as plt
+from utils import ImageViewer, load_normed_data, plot_training_history
 
-# Load the Fashion MNIST training and test data sets
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
-# shuffle the training data, then split off 5000 records for validation
-idx = tf.random.shuffle(tf.range(len(x_train)))
-x_train, y_train = x_train[idx], y_train[idx]
-x_val, x_train = x_train[:5000], x_train[5000:]
-y_val, y_train = y_train[:5000], y_train[5000:]
-# Normalize pixel values to be between 0 and 1
-x_train, x_val, x_test = x_train/255.0, x_val/255.0, x_test/255.0
+RANDOM_SEED = 12    # 12th man - go Seahawks!
+BATCH_SIZE = 256
+EPOCHS = 10
+SHOW_LOADED_DATA = False
 
+tf.random.set_seed(RANDOM_SEED)
+
+# Load the Fashion MNIST data sets, split off 5000 train records for validation
+(x_train, y_train), (x_val, y_val), (x_test, y_test) = load_normed_data(tf.keras.datasets.fashion_mnist, RANDOM_SEED)
 class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
                'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-print ("Fashion MNIST dataset loaded")
-print ("Classes: ", class_names)
-print ("Training data shape: ", x_train.shape)
-print ("Test data shape: ", x_test.shape)
 
-def plot_images(x, y, rows=5, cols=5, figsize=(10,10)):
-    """Plot a grid of rows x cols images, labeled from y and classes"""
-    plt.figure(figsize=figsize)
-    for i in range(rows * cols):
-        plt.subplot(rows, cols, i+1)
-        plt.xticks([])
-        plt.yticks([])
-        plt.grid(False)
-        plt.imshow(x[i], cmap=plt.cm.binary)  # pylint: disable=no-member
-        plt.xlabel(class_names[y[i]])
-    plt.show()
+if SHOW_LOADED_DATA:
+    print ("Fashion MNIST dataset loaded")
+    print ("Classes: ", class_names)
+    print ("Training data shape: ", x_train.shape)
+    print ("Validation data shape: ", x_val.shape)
+    print ("Test data shape: ", x_test.shape)
+    ImageViewer(x_train, y_train, class_names)
 
 # Accuracy after 10 epochs: 98.34, 92.56, 92.14 train/dev/test. Overfitting.
 # Shirts are hardest to classify (vs t-shirt, pullover, coat, dress).
@@ -44,34 +37,14 @@ def plot_images(x, y, rows=5, cols=5, figsize=(10,10)):
 model = tf.keras.models.Sequential([
     tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1), padding='same'),
     tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
     tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
     tf.keras.layers.Flatten(),
     tf.keras.layers.BatchNormalization(),
     tf.keras.layers.Dense(256, activation='relu'),
     tf.keras.layers.Dropout(0.3),
-    tf.keras.layers.Dense(10), 
+    tf.keras.layers.Dense(10),
 ])
-
-"""
-# Alternative using the functional API
-def create_model():
-  input_img = tf.keras.Input(shape=(28, 28, 1))
-  x = tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
-  x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-  x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-  x = tf.keras.layers.MaxPooling2D((2, 2))(x)
-  x = tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-  x = tf.keras.layers.Flatten()(x)
-  x = tf.keras.layers.BatchNormalization()(x)
-  x = tf.keras.layers.Dense(256, activation='relu')(x)
-  x = tf.keras.layers.Dropout(0.3)(x)
-  x = tf.keras.layers.Dense(10)(x)
-  model = tf.keras.Model(inputs=input_img, outputs=x)
-  return model
-model = create_model()
-"""
 
 model.compile(optimizer='adam',
               loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
@@ -81,28 +54,10 @@ print ("Model summary:")
 model.summary()
 
 print ("\nModel training:")
-history = model.fit(x_train, y_train, epochs=10, validation_data=(x_val, y_val), batch_size=256) # pylint: disable=invalid-name
-# Graph the training and validation accuracy/loss
-plt.figure(figsize=(8, 8))
-plt.subplot(2, 1, 1)
-plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
-plt.legend(loc='lower right')
-plt.ylabel('Accuracy')
-plt.ylim([min(plt.ylim()),1])
-plt.title('Training and Validation Accuracy')
-plt.show(block = True)
+history = model.fit(x_train, y_train, epochs=EPOCHS, validation_data=(x_val, y_val), batch_size=BATCH_SIZE)
 
-# Graph the training and validation loss
-plt.subplot(2, 1, 2)
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.legend(loc='upper right')
-plt.ylabel('Cross Entropy')
-plt.ylim([0,1.0])
-plt.title('Training and Validation Loss')
-plt.xlabel('epoch')
-plt.show(block = True)
+# Graph the training and validation accuracy/loss
+plot_training_history(history)
 
 print ("\nModel evaluation")
 train_loss, train_accuracy = model.evaluate(x_train, y_train, verbose=0)
@@ -117,3 +72,13 @@ print ("\nConfusion matrix")
 y_pred = model.predict(x_train).argmax(axis=1)
 cm = tf.math.confusion_matrix(labels=y_train, predictions=y_pred)
 print (cm)
+
+# Show misclassified images
+bad_x = []
+bad_y = []
+for x, y, pred in zip(x_train, y_train, y_pred):
+    if y != pred:
+        bad_x.append(x)
+        bad_y.append(pred)
+
+ImageViewer(bad_x, bad_y, class_names, title="Misclassified images")
