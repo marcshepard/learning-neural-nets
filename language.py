@@ -15,7 +15,6 @@ import numpy as np
 from tensorflow.keras.layers import Embedding
 from tensorflow.keras.initializers import Constant
 
-
 TRACE_DEBUG = True
 
 def trace (*args, **kwargs):
@@ -24,11 +23,11 @@ def trace (*args, **kwargs):
 
 class glove_embeddings:
     def __init__ (self):
-        list_of_files = glob("glove.*.txt")
+        list_of_files = glob("data/glove/glove.*.txt")
         if len(list_of_files) == 0:
             trace ("Couldn't find any Glove files (glove.*.txt) in the current directory")
             return None
-        self.glove_file = max(list_of_files, key=path.getctime)
+        self.glove_file = max(list_of_files, key=path.getmtime)
         trace (f"Using Glove file: {self.glove_file}")
         self.cosine_similarity = False  # False = use squared distance
         
@@ -48,7 +47,11 @@ class glove_embeddings:
     def get_distance (self, vec1, vec2) -> float:
         # Return the distance between two vectors
         if self.cosine_similarity:
-            return np.dot(vec1, vec2)
+            dot = np.dot(vec1, vec2)
+            norm = np.linalg.norm(vec1) * np.linalg.norm(vec2)
+            if np.isclose(norm, 0, atol=1e-10):
+                return 0
+            return dot/norm
         else:
             return np.dot(vec1 - vec2, vec1 - vec2)
         
@@ -120,12 +123,20 @@ class embedding_explorer:
                 if len(words) != 3:
                     print ("You must enter three words")
                     continue
+                vocab = self.glove.get_words()
+                for w in words:
+                    if w not in vocab:
+                        print (f"Sorry, {w} is not in my vocabulary")
+                        continue
                 word1, word2, word3 = words
                 print (f"Closest analogies for {word1} is to {word2} as {word3} is to:")
                 for w, sim in self.glove.find_analogies(word1, word2, word3):
                     print (f"{w}: {sim}")
             elif cmd == "s":
                 word = input ("What word? ")
+                if word not in self.glove.get_words():
+                    print (f"Sorry, {word} is not in my vocabulary")
+                    continue
                 print (f"Closest words to {word}:")
                 for w, sim in self.glove.find_closest_words(word):
                     print (f"{w}: {sim}")
