@@ -1,6 +1,6 @@
 # pylint: disable=line-too-long, invalid-name, protected-access, too-few-public-methods, too-many-arguments, too-many-locals
 """
-backprop.py - learning how neural network training works from basic principals
+micrograd.py - learning how neural network training works from basic principals
 
 I initially wrote a back-prop library from scratch to learn the algos, and I though the layering was pretty clean.
 But then I saw Andrej Karpathy's https://www.youtube.com/watch?v=VMj-3S1tku0 video and accompanying
@@ -223,7 +223,7 @@ def svm_max_margin_loss (ys, yhats):
     loss = 0
     for y,yhat in zip(ys,yhats):
         loss += sum(relu((1 + -yi*scorei)) for yi, scorei in zip(y, yhat))/len(y)
-    return loss / len(ys)
+    return loss/len(ys)
 
 # Some common metrics for evaluating a model's performance
 def accuracy (ys, yhats):
@@ -231,7 +231,7 @@ def accuracy (ys, yhats):
     correct = 0
     for y,yhat in zip(ys,yhats):
         correct += sum(list((yi > 0) == (yhati.data > 0) for yi, yhati in zip(y, yhat)))
-    return correct/len(y)
+    return correct/len(ys)
 
 # Optimizers
 class Optimizer:
@@ -256,7 +256,7 @@ class SGD(Optimizer):
     def step(self):
         self.lr *= (1 - self.lr_decay)
         for p in self.model.parameters():
-            if self.gradient_cliping:
+            if self.gradient_cliping is not None:
                 grad = min(max(p.grad, -self.gradient_cliping), self.gradient_cliping)
             else:
                 grad = p.grad
