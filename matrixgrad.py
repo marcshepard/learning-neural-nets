@@ -13,7 +13,6 @@ See matrixgrad.ipynb for examples of how to use these classes.
 
 # pylint: disable=line-too-long, invalid-name, protected-access, too-few-public-methods, too-many-arguments, too-many-locals
 
-from collections import OrderedDict
 import numpy as np
 
 class Matrix:
@@ -106,6 +105,16 @@ class Matrix:
 
         def _backward():
             self.grad += out.grad
+        out._backward = _backward
+
+        return out
+
+    def log(self):
+        """ log the elements in this matrix """
+        out = Matrix(np.log(self.data), (self,), 'log')
+
+        def _backward():
+            self.grad += (1/self.data) * out.grad
         out._backward = _backward
 
         return out
@@ -233,6 +242,18 @@ class ReLU(Module):
     def __repr__(self):
         return "ReLU"
 
+class Sigmoid(Module):
+    """ Sigmoid activation layer """
+
+    def __call__(self, x):
+        return sigmoid(x)
+
+    def parameters(self):
+        return ()
+
+    def __repr__(self):
+        return "Sigmoid"
+
 class Sequential(Module):
     """ A list of other module layers that are to be run sequentially """
 
@@ -263,23 +284,25 @@ def mse_loss (ys, yhats):
         loss += ((y-yhat)**2).sum()
     return loss / n_elements
 
-def svm_max_margin_loss (ys, yhats):
-    """ Max Margin Loss """
+def binary_cross_entryopy_loss (ys, yhats):
+    """ Binary cross entryopy loss for binary classification """
     assert isinstance(yhats[0], Matrix), "yhats must be a collection of Matrices"
     if not isinstance(ys[0], Matrix):
         ys = [Matrix(y) for y in ys]    # ys must be a collection of things that can be converted to matrices
     n_elements = len(ys) * yhats[0].shape[0] * yhats[0].shape[1]
-    loss = relu(1 - ys[0]*yhats[0]).sum()
+    loss = -(ys[0]*yhats[0].log() + (1-ys[0])*(1-yhats[0]).log()).sum()
     for y,yhat in zip(ys[1:],yhats[1:]):
-        loss += relu(1 - y*yhat).sum()
-    return loss/n_elements
+        loss += -(y*yhat.log() + (1-y)*(1-yhat).log()).sum()
+    return loss / n_elements
 
 # Some common metrics for evaluating a model's performance
 def accuracy (ys, yhats):
     """ Accuracy - just for binary prediction for now """
+    assert isinstance(yhats[0], Matrix), "yhats must be a collection of Matrices"
+    assert yhats[0].data.size == 1, "accuracy only supported for binary predictions for now"
     correct = 0
     for y,yhat in zip(ys,yhats):
-        correct += (y[0][0] > 0) == (yhat.data[0][0] > 0)
+        correct += (y.flatten()[0] > .5) == (yhat.data.flatten()[0] > .5)
 
     return correct/len(ys)
 
@@ -293,106 +316,97 @@ class Optimizer:
 class SGD(Optimizer):
     """ Stochastic Gradient Descent """
 
-    def __init__(self, params, lr, gradient_cliping=None, lr_decay=0):
+    def __init__(self, params, lr, lr_decay=0, verbose=False):
         self.params = params
-        self.lr = lr
-        self.gradient_cliping = gradient_cliping
+        self.lr = lr                # If None, auto-tune to std(param values) / std(param grads) / 100
         self.lr_decay = lr_decay
+        self.verbose = verbose
 
     def step(self):
+        if self.verbose or self.lr is None:
+            grads = [val for p in self.params for val in p.grad.flatten().tolist()]
+            values = [val for p in self.params for val in p.data.flatten().tolist()]
+        if self.verbose:
+            zeros = sum(1 for g in grads if g == 0) / len(grads)
+            print ("Step info:")
+            print (f"\tgrad mean:\t{np.mean(grads):.4f}")
+            print (f"\tvalue mean:\t{np.mean(values):.4f}")
+            print (f"\tgrad zero pct:\t{zeros*100:.0f}%")
+            print (f"\tgrad abs max:\t{np.max(np.abs(grads)):.4f}")
+            print (f"\tgrad std:\t{np.std(grads):.4f}")
+            print (f"\tvalue std:\t{np.std(values):.4f}")
+            print (f"\tgrad/value:\t{np.std(grads)/np.std(values):.4f}, vs lr:\t\t{self.lr:.4f}")
+
         for p in self.params:
-            self.lr = self.lr * (1 - self.lr_decay)
-            if self.gradient_cliping is not None:
-                grad = p.grad.clip (-self.gradient_cliping, self.gradient_cliping)
+            if self.lr is not None:
+                self.lr = self.lr * (1 - self.lr_decay)
+                lr = self.lr
             else:
-                grad = p.grad
-            p.data -= self.lr * grad
-
-class SGDRLR (Optimizer):
-    """ Stochastic Gradient Descent with dynamic learning rate.
-    Auto-tune the learning rate to a ratio of the value to gradient std dev.
-    Also track statistics on the optimizations
-    """
-
-    # The names of the keys in the step_info dictionary to track various statistics
-    KEY_GRAD_MEAN = "grad mean"
-    KEY_VALUE_MEAN = "value mean"
-    KEY_GRAD_STD = "grad std"
-    KEY_VALUE_STD = "value std"
-    KEY_LR = "lr"
-    KEY_PCT_ZERO_GRAD = "zero grad pct"
-    KEY_GRAD_ABS_MAX = "grad abs max"
-
-    def __init__(self, params):
-        self.params = params
-        self.step_info = []     # An array of step dictionaries with info on each step
-
-    def step(self):
-        step_info = OrderedDict()                      # Information on this step
-        self.step_info.append (step_info)
-
-        grads = [val for p in self.params for val in p.grad.flatten().tolist()]
-        values = [val for p in self.params for val in p.data.flatten().tolist()]
-        zeros = sum(1 for g in grads if g == 0) / len(grads)
-        lr = np.std(values) / np.std(grads) / 1000
-
-        step_info[SGDRLR.KEY_GRAD_MEAN] = np.mean(grads)
-        step_info[SGDRLR.KEY_VALUE_MEAN] = np.mean(values)
-        step_info[SGDRLR.KEY_PCT_ZERO_GRAD] = zeros
-        step_info[SGDRLR.KEY_GRAD_ABS_MAX] = np.max(np.abs(grads))
-        step_info[SGDRLR.KEY_GRAD_STD] = np.std(grads)
-        step_info[SGDRLR.KEY_VALUE_STD] = np.std(values)
-        step_info[SGDRLR.KEY_LR] = lr
-
-        for p in self.params:
+                lr = np.std(values) / np.std(grads) / 100
             p.data -= lr * p.grad
 
-    def print_step_info (self, step_num=None):
-        """ Print the step info """
-        for step in range(len(self.step_info)) if step_num is None else [step_num]:
-            print (f"Step {step}:")
-            for key, value in self.step_info[step].items():
-                print (f"\t{key}:\t{value:.4f}")
+class Adam(Optimizer):
+    """ Adam optimizer """
+    def __init__(self, params, lr, verbose=False, beta1=.9, beta2=.999):
+        self.params = params
+        self.lr = lr
+        self.m = [np.zeros_like(p.data) for p in self.params]
+        self.v = [np.zeros_like(p.data) for p in self.params]
+        self.t = 0
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.epsilon = 1e-8
+        self.verbose = verbose
+
+    def step(self):
+        # Diagnostic info
+
+        if self.verbose:
+            grads = [val for p in self.params for val in p.grad.flatten().tolist()]
+            values = [val for p in self.params for val in p.data.flatten().tolist()]
+            zeros = sum(1 for g in grads if g == 0) / len(grads)
+            print (f"Step {self.t} info:")
+            print (f"\tgrad mean:\t{np.mean(grads):.4f}")
+            print (f"\tvalue mean:\t{np.mean(values):.4f}")
+            print (f"\tgrad zero pct:\t{zeros*100:.0f}%")
+            print (f"\tgrad abs max:\t{np.max(np.abs(grads)):.4f}")
+            print (f"\tgrad std:\t{np.std(grads):.4f}")
+            print (f"\tvalue std:\t{np.std(values):.4f}")
+            print (f"\tgrad/value:\t{np.std(grads)/np.std(values):.4f}, vs lr:\t\t{self.lr:.4f}")
+
+        # Update the models parameters using Adam
+        self.t += 1
+        for i, (p,m,v) in enumerate(zip(self.params, self.m, self.v)):
+            m = self.beta1*m + (1-self.beta1)*p.grad
+            v = self.beta2*v + (1-self.beta2)*(p.grad**2)
+            mhat = m / (1 - self.beta1**self.t)
+            vhat = v / (1 - self.beta2**self.t)
+            p.data -= self.lr * mhat / (np.sqrt(vhat) + self.epsilon)
+            self.m[i] = m
+            self.v[i] = v
 
 # Now let's define a function to train a model
 
-def batch_loss(model, X, y, loss_fn, regularization_alpha, metrics):
-    """ Compute the loss for a batch of data, plus optionally additional metrics """
-    # forward pass
-    yhat = [model(xi) for xi in X]
-
-    # compute loss
-    loss = loss_fn(y, yhat)
-    if regularization_alpha is not None:
-        # L2 regularization
-        for p in model.parameters():
-            loss += regularization_alpha * (p**2).sum()
-
-    # compute any additional metrics
-    return [loss] + [metric(y, yhat) for metric in metrics]
-
-def evaluate(model, X, y, loss_fn=mse_loss, metrics=()):
-    """ Compute the loss and metrics for a batch of data """
-    return batch_loss(model, X, y, loss_fn, None, metrics)
-
-def fit(model, X, y, optimizer, loss_fn=mse_loss, epochs=1, batch_size=None, regularization_alpha=None, metrics=(), verbose=False):
+def fit(model, x, y, optimizer, loss_fn=mse_loss, epochs=1, batch_size=None, metrics=(), verbose=False):
     """ Train a model the given optimizer and loss function """
-    data = list(zip(X, y))
+    data = list(zip(x, y))
 
     for epoch in range(epochs):
         if batch_size is None:
             batches = [data]
         else:
             np.random.shuffle(data)
-            batches = [data[i:i+batch_size] for i in range(0, len(X), batch_size)]
+            batches = [data[i:i+batch_size] for i in range(0, len(x), batch_size)]
 
         epoch_loss = 0
         epoch_metric_values = [0] * len(metrics)
 
         for batch in batches:
-            X_batch, y_batch = zip(*batch)
+            x_batch, y_batch = zip(*batch)
+
             # forward
-            loss, *metric_values = batch_loss(model, X_batch, y_batch, loss_fn=loss_fn, regularization_alpha=regularization_alpha, metrics=metrics)
+            yhat = [model(xi) for xi in x_batch]
+            loss = loss_fn(y_batch, yhat)
 
             # backward
             model.zero_grad()
@@ -404,6 +418,7 @@ def fit(model, X, y, optimizer, loss_fn=mse_loss, epochs=1, batch_size=None, reg
             # Update metrics
             epoch_loss += loss.data
             if metrics:
+                metric_values = [metric(y_batch, yhat) for metric in metrics]
                 epoch_metric_values = [m + v for m,v in zip(epoch_metric_values, metric_values)]
 
         if verbose:
@@ -412,34 +427,9 @@ def fit(model, X, y, optimizer, loss_fn=mse_loss, epochs=1, batch_size=None, reg
                 print (f", {', '.join(f'{metric.__name__}={m/len(batches)}' for metric,m in zip(metrics, epoch_metric_values))}", end="")
             print ()
 
-def classification_test():
-    """ Classification test """
-    import matplotlib.pyplot as plt
-    from sklearn.datasets import make_moons
-
-    EPOCHS = 10
-
-    np.random.seed(12)  # 12th man, go Seahawks!
-
-    x, y = make_moons(n_samples=100, noise=0.1) # Two interlevered half circles
-    y = y.reshape ((100, 1, 1))                 # Make y an array of 1x1 arrays to match the output shape of the model
-
-    # visualize in 2D
-    plt.figure(figsize=(5,5))
-    plt.scatter(x[:,0], x[:,1], c=y[:,0], s=20, cmap='jet')
-    plt.show()
-
-    model = Sequential([Linear(2, 16), ReLU(), Linear(16, 16), ReLU(), Linear(16, 1)])
-    print (model)
-
-    # train the model using SGD
-    #opt = SGD(model, lr=.1, lr_decay=.02, gradient_cliping=1)
-    opt = SGDRLR(model.parameters())
-    loss_fn = mse_loss
-    fit (model, x, y, loss_fn=loss_fn, optimizer=opt, epochs=EPOCHS, regularization_alpha=1e-4, batch_size=None, metrics=(accuracy,), verbose=True)
-
-    opt.print_step_info()
-
-classification_test()
-
-
+def evaluate(model, X, y, loss_fn=mse_loss, metrics=()):
+    """ Compute the loss and metrics for a batch of data """
+    yhat = [model(xi) for xi in X]
+    loss = loss_fn(y, yhat)
+    metric_values = [metric(y, yhat) for metric in metrics]
+    return loss, metric_values
